@@ -28,3 +28,13 @@ path = "src/tomharte.rs"
 [[bin]]
 name = "klaus"
 path = "src/klaus.rs"
+
+# Disassemble part of an image: ask what the CPU is executing.
+[[bin]]
+name = "dis"
+path = "src/dis.rs"
+
+# Boot a cartridge on the real BIOS and report what it is executing.
+[[bin]]
+name = "boot"
+path = "src/boot.rs"

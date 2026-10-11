@@ -51,7 +51,13 @@
 //! extremes will feel wrong and will also be wrong, and "centre" is a value the
 //! hardware never reliably returns on its own.
 
+pub mod antic;
+pub mod cart;
 pub mod cpu;
+pub mod disasm;
+pub mod gtia;
+pub mod machine;
+pub mod pokey;
 pub mod save;
 
 /// 6502C "SALLY" clock, 1.79 MHz NTSC.
