@@ -35,24 +35,32 @@
 //! checked against the header our host compiles
 //! (TrophyHubLibretroHost/src/libretro/retro_types.h).
 //!
-//! # Controls (first pass)
+//! # Controls
 //!
-//! A 5200 controller is an analog stick that does not self-centre, a bottom
-//! and a top fire button, a twelve-key pad, and Start, Pause, Reset. The
-//! stick is read as a pot count, 1 to 227 with 114 at rest.
+//! A 5200 controller is an analog stick that does not self-centre, two
+//! fire buttons on each side (the two bottoms are one input, the two tops
+//! another), a twelve-key pad, and Start, Pause and Reset. The stick is read
+//! as a pot count, 1 to 227, with 114 at rest.
+//!
+//! The mapping is chosen so Trophy Hub can reuse its Intellivision pad (an
+//! analog stick, a three-button T, a twelve-key panel in the same grid): every
+//! input below is what that pad already sends, except the Select pill and a
+//! single L pill, for Pause and Reset.
 //!
 //! | 5200 | RetroPad |
 //! |---|---|
 //! | stick | left analog, proportional; D-pad, full deflection |
-//! | bottom fire, top fire | B, A |
-//! | Start, Pause, Reset | START, SELECT, R3 |
-//! | keypad 1, 2, 3 | Y, X, L |
-//! | keypad 4, 5, 6 | R, L2, R2 |
-//! | keypad `*`, 0, `#` | right analog left, down, right |
-//! | keypad 7, 8, 9 | right analog up, L3, keyboard |
+//! | bottom fire | B or A |
+//! | top fire | Y or X |
+//! | Start, Pause, Reset | START, SELECT, L |
+//! | keypad 1-4, 6-9 | right analog, the eight directions of the grid |
+//! | keypad 5, 0 | R3, L3 |
+//! | keypad `*`, `#` | L2, R2 (Intellivision's Clear and Enter) |
 //!
-//! Keyboard on port 1: digits, `*`, `#`. This mapping is provisional until
-//! the controls are done properly against the app's on-screen pad.
+//! The right-stick keys follow the grid around 5: up-left is 1, up is 2,
+//! up-right is 3, left 4, right 6, down-left 7, down 8, down-right 9. A
+//! direction counts once the stick is past half way on that axis. Keyboard on
+//! port 1: digits, `*`, `#`.
 
 #![allow(clippy::missing_safety_doc)]
 
@@ -101,32 +109,32 @@ const JOY_RIGHT: c_uint = 7;
 const JOY_A: c_uint = 8;
 const JOY_X: c_uint = 9;
 const JOY_L: c_uint = 10;
-const JOY_R: c_uint = 11;
 const JOY_L2: c_uint = 12;
 const JOY_R2: c_uint = 13;
 const JOY_L3: c_uint = 14;
 const JOY_R3: c_uint = 15;
 
-/// Keypad keys on RetroPad buttons, first held wins.
-const KEY_BUTTONS: [(c_uint, Key); 10] = [
+/// Keys on RetroPad buttons, first held wins.
+const KEY_BUTTONS: [(c_uint, Key); 7] = [
     (JOY_START, Key::Start),
     (JOY_SELECT, Key::Pause),
-    (JOY_R3, Key::Reset),
-    (JOY_Y, Key::Digit(1)),
-    (JOY_X, Key::Digit(2)),
-    (JOY_L, Key::Digit(3)),
-    (JOY_R, Key::Digit(4)),
-    (JOY_L2, Key::Digit(5)),
-    (JOY_R2, Key::Digit(6)),
-    (JOY_L3, Key::Digit(8)),
+    (JOY_L, Key::Reset),
+    (JOY_R3, Key::Digit(5)),
+    (JOY_L3, Key::Digit(0)),
+    (JOY_L2, Key::Star),
+    (JOY_R2, Key::Hash),
 ];
 
-/// Keypad keys on right-stick directions: (axis, sign, key).
-const KEY_AXES: [(c_uint, i16, Key); 4] = [
-    (AXIS_X, -1, Key::Star),
-    (AXIS_Y, 1, Key::Digit(0)),
-    (AXIS_X, 1, Key::Hash),
-    (AXIS_Y, -1, Key::Digit(7)),
+/// Keypad keys on the right stick: (x sign, y sign) -> key, the grid around 5.
+const KEY_DIRECTIONS: [((i8, i8), Key); 8] = [
+    ((-1, -1), Key::Digit(1)),
+    ((0, -1), Key::Digit(2)),
+    ((1, -1), Key::Digit(3)),
+    ((-1, 0), Key::Digit(4)),
+    ((1, 0), Key::Digit(6)),
+    ((-1, 1), Key::Digit(7)),
+    ((0, 1), Key::Digit(8)),
+    ((1, 1), Key::Digit(9)),
 ];
 
 /// libretro keyboard codes: '0'-'9' are ASCII, `*` is 42 and keypad `*`
@@ -368,23 +376,22 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
 unsafe fn set_input_descriptors(env: EnvironmentFn) {
     let mut d = Vec::new();
     for port in 0..4 {
-        let buttons: [(c_uint, &'static std::ffi::CStr); 16] = [
+        let buttons: [(c_uint, &'static std::ffi::CStr); 15] = [
             (JOY_UP, c"Stick up (full)"),
             (JOY_DOWN, c"Stick down (full)"),
             (JOY_LEFT, c"Stick left (full)"),
             (JOY_RIGHT, c"Stick right (full)"),
             (JOY_B, c"Bottom fire"),
-            (JOY_A, c"Top fire"),
+            (JOY_A, c"Bottom fire"),
+            (JOY_Y, c"Top fire"),
+            (JOY_X, c"Top fire"),
             (JOY_START, c"Start"),
             (JOY_SELECT, c"Pause"),
-            (JOY_R3, c"Reset"),
-            (JOY_Y, c"Keypad 1"),
-            (JOY_X, c"Keypad 2"),
-            (JOY_L, c"Keypad 3"),
-            (JOY_R, c"Keypad 4"),
-            (JOY_L2, c"Keypad 5"),
-            (JOY_R2, c"Keypad 6"),
-            (JOY_L3, c"Keypad 8"),
+            (JOY_L, c"Reset"),
+            (JOY_R3, c"Keypad 5"),
+            (JOY_L3, c"Keypad 0"),
+            (JOY_L2, c"Keypad *"),
+            (JOY_R2, c"Keypad #"),
         ];
         for (id, name) in buttons {
             d.push(RetroInputDescriptor { port, device: RETRO_DEVICE_JOYPAD, index: 0, id, description: name.as_ptr() });
@@ -392,7 +399,7 @@ unsafe fn set_input_descriptors(env: EnvironmentFn) {
         for (axis, name) in [(AXIS_X, c"Stick X (analog)"), (AXIS_Y, c"Stick Y (analog)")] {
             d.push(RetroInputDescriptor { port, device: RETRO_DEVICE_ANALOG, index: ANALOG_LEFT, id: axis, description: name.as_ptr() });
         }
-        for (axis, name) in [(AXIS_X, c"Keypad * (left) / # (right)"), (AXIS_Y, c"Keypad 7 (up) / 0 (down)")] {
+        for (axis, name) in [(AXIS_X, c"Keypad 4/6 (and 1/3/7/9)"), (AXIS_Y, c"Keypad 2/8 (and 1/3/7/9)")] {
             d.push(RetroInputDescriptor { port, device: RETRO_DEVICE_ANALOG, index: ANALOG_RIGHT, id: axis, description: name.as_ptr() });
         }
     }
@@ -444,6 +451,23 @@ fn pot(v: i16) -> u8 {
     p.clamp(1, 227) as u8
 }
 
+/// Which way a stick axis points: -1, 0 or 1, past half deflection.
+fn sign(v: i16) -> i8 {
+    if v as i32 > ANALOG_PRESSED as i32 {
+        1
+    } else if (v as i32) < -(ANALOG_PRESSED as i32) {
+        -1
+    } else {
+        0
+    }
+}
+
+/// The keypad key a right-stick position stands for, if any.
+fn key_for_direction(x: i16, y: i16) -> Option<Key> {
+    let d = (sign(x), sign(y));
+    KEY_DIRECTIONS.iter().find(|&&(dir, _)| dir == d).map(|&(_, k)| k)
+}
+
 /// One controller as the frontend reports it, written into POKEY and GTIA.
 unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) {
     let held = |id| state(port, RETRO_DEVICE_JOYPAD, 0, id) != 0;
@@ -462,10 +486,7 @@ unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) {
     }
     let mut key = KEY_BUTTONS.iter().find(|&&(id, _)| held(id)).map(|&(_, k)| k);
     if key.is_none() {
-        key = KEY_AXES
-            .iter()
-            .find(|&&(a, sign, _)| (axis(ANALOG_RIGHT, a) as i32 * sign as i32) > ANALOG_PRESSED as i32)
-            .map(|&(_, _, k)| k);
+        key = key_for_direction(axis(ANALOG_RIGHT, AXIS_X), axis(ANALOG_RIGHT, AXIS_Y));
     }
     if port == 0 && key.is_none() {
         key = KEYBOARD.iter().find(|&&(code, _)| state(0, RETRO_DEVICE_KEYBOARD, 0, code) != 0).map(|&(_, k)| k);
@@ -473,8 +494,8 @@ unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) {
     let c = &mut m.bus.pokey.controllers[port as usize];
     c.pot = [x, y];
     c.key = key;
-    c.top = held(JOY_A);
-    m.bus.gtia.trigger[port as usize] = held(JOY_B);
+    c.top = held(JOY_Y) || held(JOY_X);
+    m.bus.gtia.trigger[port as usize] = held(JOY_B) || held(JOY_A);
 }
 
 #[no_mangle]
@@ -659,6 +680,96 @@ mod tests {
             drop(seen);
             retro_unload_game();
         }
+    }
+
+    /// What the fake frontend reports: joypad ids held, and analog values.
+    #[derive(Default, Clone, Copy)]
+    struct Pad {
+        buttons: u32,
+        left: (i16, i16),
+        right: (i16, i16),
+    }
+    static PAD: Mutex<Pad> = Mutex::new(Pad { buttons: 0, left: (0, 0), right: (0, 0) });
+
+    unsafe extern "C" fn input(port: c_uint, device: c_uint, index: c_uint, id: c_uint) -> i16 {
+        if port != 0 {
+            return 0;
+        }
+        let p = *PAD.lock().unwrap();
+        match device {
+            RETRO_DEVICE_JOYPAD => ((p.buttons >> id) & 1) as i16,
+            RETRO_DEVICE_ANALOG => {
+                let (x, y) = if index == ANALOG_LEFT { p.left } else { p.right };
+                if id == AXIS_X { x } else { y }
+            }
+            _ => 0,
+        }
+    }
+
+    /// Run the mapping once for a pad state, return controller 1 as POKEY
+    /// and GTIA see it.
+    fn read(pad: Pad) -> (Option<Key>, [u8; 2], bool, bool) {
+        *PAD.lock().unwrap() = pad;
+        let mut m = Machine::new(Cart::identified(cart()).unwrap(), None);
+        unsafe { read_controller(&mut m, input, 0) };
+        let c = m.bus.pokey.controllers[0];
+        (c.key, c.pot, c.top, m.bus.gtia.trigger[0])
+    }
+
+    fn held(ids: &[c_uint]) -> Pad {
+        Pad { buttons: ids.iter().map(|&i| 1u32 << i).sum(), ..Pad::default() }
+    }
+
+    #[test]
+    fn the_intellivision_panel_keypad_lands_on_the_5200_keys() {
+        let _g = SERIAL.lock().unwrap();
+        // The panel pulses the right stick to +-0x7F00 on each axis.
+        const D: i16 = 0x7f00;
+        let grid = [
+            ((-D, -D), Key::Digit(1)),
+            ((0, -D), Key::Digit(2)),
+            ((D, -D), Key::Digit(3)),
+            ((-D, 0), Key::Digit(4)),
+            ((D, 0), Key::Digit(6)),
+            ((-D, D), Key::Digit(7)),
+            ((0, D), Key::Digit(8)),
+            ((D, D), Key::Digit(9)),
+        ];
+        for (right, key) in grid {
+            assert_eq!(read(Pad { right, ..Pad::default() }).0, Some(key), "right stick {right:?}");
+        }
+        assert_eq!(read(held(&[JOY_R3])).0, Some(Key::Digit(5)));
+        assert_eq!(read(held(&[JOY_L3])).0, Some(Key::Digit(0)));
+        assert_eq!(read(held(&[JOY_L2])).0, Some(Key::Star), "Clear is *");
+        assert_eq!(read(held(&[JOY_R2])).0, Some(Key::Hash), "Enter is #");
+        assert_eq!(read(Pad::default()).0, None, "a centred stick is no key");
+    }
+
+    #[test]
+    fn start_pause_reset_and_both_fire_pairs() {
+        let _g = SERIAL.lock().unwrap();
+        assert_eq!(read(held(&[JOY_START])).0, Some(Key::Start));
+        assert_eq!(read(held(&[JOY_SELECT])).0, Some(Key::Pause));
+        assert_eq!(read(held(&[JOY_L])).0, Some(Key::Reset));
+        for b in [JOY_B, JOY_A] {
+            let (_, _, top, bottom) = read(held(&[b]));
+            assert!(bottom && !top, "{b} is the bottom fire");
+        }
+        for b in [JOY_Y, JOY_X] {
+            let (_, _, top, bottom) = read(held(&[b]));
+            assert!(top && !bottom, "{b} is the top fire");
+        }
+    }
+
+    #[test]
+    fn the_left_stick_is_proportional_and_the_dpad_is_full_travel() {
+        let _g = SERIAL.lock().unwrap();
+        assert_eq!(read(Pad::default()).1, [114, 114]);
+        assert_eq!(read(Pad { left: (16384, -16384), ..Pad::default() }).1, [pot(16384), pot(-16384)]);
+        assert_eq!(read(held(&[JOY_LEFT, JOY_DOWN])).1, [1, 227]);
+        // The stick does not leak into the keypad, nor the keypad into it.
+        assert_eq!(read(Pad { left: (i16::MAX, i16::MAX), ..Pad::default() }).0, None);
+        assert_eq!(read(Pad { right: (i16::MAX, 0), ..Pad::default() }).1, [114, 114]);
     }
 
     #[test]
