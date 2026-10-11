@@ -38,3 +38,9 @@ path = "src/dis.rs"
 [[bin]]
 name = "boot"
 path = "src/boot.rs"
+
+# BIOS census: what each cartridge uses of the real BIOS. The instrument the
+# HLE is designed from, and, re-run in HLE mode, its diff harness.
+[[bin]]
+name = "census"
+path = "src/census.rs"
