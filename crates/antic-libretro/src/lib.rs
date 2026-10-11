@@ -240,6 +240,9 @@ struct Core {
     pal: [[u8; 3]; 256],
     video: Vec<u32>,
     stereo: Vec<i16>,
+    /// Whether a second player has touched a pad since the game loaded. Until
+    /// then the keypad is shared; see [`share_keypad`].
+    others_seen: bool,
 }
 
 static mut CORE: Option<Core> = None;
@@ -384,7 +387,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             return false;
         }
     }
-    CORE = Some(Core { machine, rom, pal: palette(), video: vec![0; VIEW_W * VIEW_H], stereo: Vec::new() });
+    CORE = Some(Core { machine, rom, pal: palette(), video: vec![0; VIEW_W * VIEW_H], stereo: Vec::new(), others_seen: false });
     if let Some(env) = ENVIRON {
         set_input_descriptors(env);
         set_memory_maps(env);
@@ -490,7 +493,8 @@ fn key_for_direction(x: i16, y: i16) -> Option<Key> {
 }
 
 /// One controller as the frontend reports it, written into POKEY and GTIA.
-unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) {
+/// Read one port into the machine. True when anything on it is in use.
+unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) -> bool {
     let held = |id| state(port, RETRO_DEVICE_JOYPAD, 0, id) != 0;
     let axis = |index, id| state(port, RETRO_DEVICE_ANALOG, index, id);
     let mut x = pot(axis(ANALOG_LEFT, AXIS_X));
@@ -516,7 +520,29 @@ unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) {
     c.pot = [x, y];
     c.key = key;
     c.top = held(JOY_Y) || held(JOY_X);
-    m.bus.gtia.trigger[port as usize] = held(JOY_B) || held(JOY_A);
+    let fire = held(JOY_B) || held(JOY_A);
+    m.bus.gtia.trigger[port as usize] = fire;
+    key.is_some() || c.top || fire || x != 114 || y != 114
+}
+
+/// One player, two keypads. On the 5200 each controller has its own keypad
+/// and a game reads whichever one it selects, so a two-sided game such as
+/// RealSports Football waits for the defence's play on controller 2's
+/// keypad, which a single pad can never reach. a5200 shares one keypad
+/// across all four controllers, which is why the same game works there with
+/// one pad. Until a second player touches a pad, controller 1's keypad and
+/// top button are seen on every controller, as on a5200. Once one does, each
+/// controller has its own again, as on hardware, so player 1's key no longer
+/// answers for player 2.
+fn share_keypad(m: &mut Machine, others_seen: &mut bool, active: [bool; 4]) {
+    *others_seen |= active[1..].iter().any(|&a| a);
+    if !*others_seen {
+        let c = m.bus.pokey.controllers[0];
+        for other in &mut m.bus.pokey.controllers[1..] {
+            other.key = c.key;
+            other.top = c.top;
+        }
+    }
 }
 
 #[no_mangle]
@@ -526,9 +552,11 @@ pub unsafe extern "C" fn retro_run() {
     }
     let Some(c) = core() else { return };
     if let Some(state) = INPUT_STATE {
+        let mut active = [false; 4];
         for port in 0..4 {
-            read_controller(&mut c.machine, state, port);
+            active[port as usize] = read_controller(&mut c.machine, state, port);
         }
+        share_keypad(&mut c.machine, &mut c.others_seen, active);
     }
     c.machine.run_frame();
     view(&c.machine.bus.gtia.frame, &c.pal, &mut c.video);
@@ -838,6 +866,42 @@ mod tests {
             retro_unload_game();
             assert_eq!(retro_serialize_size(), 0, "no game, no state");
         }
+    }
+
+    #[test]
+    fn one_pad_reaches_every_keypad_until_a_second_player_joins() {
+        let mut m = Machine::new(Cart::identified(cart()).unwrap(), None);
+        let mut seen = false;
+        m.bus.pokey.controllers[0].key = Some(Key::Digit(2));
+        m.bus.pokey.controllers[0].top = true;
+        share_keypad(&mut m, &mut seen, [true, false, false, false]);
+        for c in 1..4 {
+            assert_eq!(m.bus.pokey.controllers[c].key, Some(Key::Digit(2)), "controller {}", c + 1);
+            assert!(m.bus.pokey.controllers[c].top);
+        }
+        // Player 2 moves a stick: from now on the keypads are separate.
+        for c in 1..4 {
+            m.bus.pokey.controllers[c].key = None;
+            m.bus.pokey.controllers[c].top = false;
+        }
+        share_keypad(&mut m, &mut seen, [true, true, false, false]);
+        share_keypad(&mut m, &mut seen, [true, false, false, false]);
+        assert!(seen);
+        assert_eq!(m.bus.pokey.controllers[1].key, None);
+        assert!(!m.bus.pokey.controllers[1].top);
+    }
+
+    #[test]
+    fn an_idle_port_is_not_activity_and_a_moved_stick_is() {
+        let _g = SERIAL.lock().unwrap();
+        let mut m = Machine::new(Cart::identified(cart()).unwrap(), None);
+        *PAD.lock().unwrap() = Pad::default();
+        assert!(!unsafe { read_controller(&mut m, input, 1) }, "port 2 reports nothing");
+        assert!(!unsafe { read_controller(&mut m, input, 0) }, "a pad at rest");
+        *PAD.lock().unwrap() = Pad { left: (0x7000, 0), ..Pad::default() };
+        assert!(unsafe { read_controller(&mut m, input, 0) });
+        *PAD.lock().unwrap() = held(&[JOY_START]);
+        assert!(unsafe { read_controller(&mut m, input, 0) });
     }
 
     #[test]
