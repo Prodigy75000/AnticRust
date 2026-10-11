@@ -18,6 +18,8 @@ antic-core = { path = "../antic-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 flate2 = "1"
+# shot harness: PNG output.
+png = "0.17"
 
 # CPU conformance: TomHarte single-step vectors (NMOS 6502, decimal on).
 [[bin]]
@@ -44,3 +46,13 @@ path = "src/boot.rs"
 [[bin]]
 name = "census"
 path = "src/census.rs"
+
+# Save frames as PNG: the first way to see the machine, not just count it.
+[[bin]]
+name = "shot"
+path = "src/shot.rs"
+
+# Decode the display list a cartridge is running.
+[[bin]]
+name = "dlist"
+path = "src/dlist.rs"

@@ -139,6 +139,16 @@ impl Bus {
 
     fn write_mem(&mut self, addr: u16, v: u8) {
         self.open_bus = v;
+        // Anything that can change the picture: draw up to now with the old
+        // value first, so mid-line changes land where the hardware puts them.
+        let visual = match addr {
+            0xc000..=0xcfff => true,
+            0xd400..=0xd4ff => matches!(addr & 0x0f, 0x00 | 0x01 | 0x04 | 0x09),
+            _ => false,
+        };
+        if visual {
+            self.gtia.render_to(&self.antic, self.antic.hpos * 2);
+        }
         match addr {
             0x0000..=0x3fff => self.ram[addr as usize] = v,
             0x4000..=0xbfff => self.cart.access(addr),
@@ -174,6 +184,11 @@ impl Bus {
                 self.peek(f.addr).unwrap_or(self.open_bus)
             };
             self.antic.complete(f, v);
+            match f.slot {
+                crate::antic::Slot::Player(n) => self.gtia.dma_player(n, v),
+                crate::antic::Slot::Missile => self.gtia.dma_missiles(v),
+                _ => {}
+            }
             if let Some(p) = self.probe.as_mut() {
                 if f.slot != crate::antic::Slot::Refresh {
                     p.access(&Access {
@@ -190,7 +205,13 @@ impl Bus {
         let line_start = self.antic.hpos == 0;
         let (p, s) = (self.gtia.pots_powered(), self.gtia.selected_controller());
         self.pokey.tick(line_start, p, s);
+        if self.antic.hpos == CYCLES_PER_LINE - 1 {
+            self.gtia.render_to(&self.antic, 228);
+        }
         self.antic.advance();
+        if self.antic.hpos == 0 {
+            self.gtia.begin_line();
+        }
         self.cycles += 1;
     }
 
@@ -285,6 +306,12 @@ impl Machine {
         self.bus.in_interrupt = self.cpu.poll_prev != Pending::None && !self.cpu.halted;
         self.cpu.step(&mut self.bus);
         self.bus.in_interrupt = false;
+    }
+
+    /// The last completed frame as RGB, `gtia::WIDTH` x `gtia::HEIGHT`.
+    pub fn frame_rgb(&self) -> Vec<u8> {
+        let pal = crate::gtia::palette();
+        self.bus.gtia.frame.iter().flat_map(|&c| pal[c as usize]).collect()
     }
 
     /// Run until ANTIC finishes the current frame.

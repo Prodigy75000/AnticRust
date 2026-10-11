@@ -37,12 +37,17 @@ pub enum Slot {
     PfLoad(u8),
     /// Character set byte for line buffer entry `n`.
     PfChar(u8),
+    /// A playfield fetch at cycle 106 or later. The hardware stop keeps it
+    /// off the bus, but ANTIC still loads whatever is on the data bus and
+    /// still advances the memory scan counter (Altirra 4.14).
+    PfLoadVirtual(u8),
+    PfCharVirtual(u8),
 }
 
 impl Slot {
     /// Whether this slot occupies the bus, halting the CPU.
     pub fn uses_bus(self) -> bool {
-        self != Slot::Free
+        !matches!(self, Slot::Free | Slot::PfLoadVirtual(_) | Slot::PfCharVirtual(_))
     }
 }
 
@@ -218,7 +223,7 @@ impl Antic {
     pub fn dma(&self) -> Option<DmaFetch> {
         let slot = self.slots[self.hpos as usize];
         let addr = match slot {
-            Slot::Free => return None,
+            Slot::Free | Slot::PfLoadVirtual(_) | Slot::PfCharVirtual(_) => return None,
             Slot::Refresh => return Some(DmaFetch { addr: 0, slot }),
             Slot::Missile => self.pm_addr(None),
             Slot::Player(n) => self.pm_addr(Some(n)),
@@ -232,7 +237,7 @@ impl Antic {
     /// Deliver the byte for this cycle's fetch.
     pub fn complete(&mut self, f: DmaFetch, v: u8) {
         match f.slot {
-            Slot::Free | Slot::Refresh => {}
+            Slot::Free | Slot::Refresh | Slot::PfLoadVirtual(_) | Slot::PfCharVirtual(_) => {}
             Slot::Missile => self.grafm = v,
             Slot::Player(n) => self.grafp[n as usize] = v,
             Slot::DlInstr => {
@@ -301,6 +306,16 @@ impl Antic {
     /// Advance one machine cycle, after this cycle's bus access. Line and
     /// frame events happen here.
     pub fn advance(&mut self) {
+        match self.slots[self.hpos as usize] {
+            Slot::PfLoadVirtual(i) => {
+                // The CPU owns the bus; its value is not visible here, so the
+                // byte is the floating-bus $FF.
+                self.line_buf[i as usize] = 0xff;
+                self.memscan = (self.memscan & 0xf000) | (self.memscan.wrapping_add(1) & 0x0fff);
+            }
+            Slot::PfCharVirtual(i) => self.char_buf[i as usize] = 0xff,
+            _ => {}
+        }
         match self.hpos {
             7 => self.nmi_status(),
             8 => {
@@ -452,23 +467,33 @@ impl Antic {
             let name_start = [0usize, 26, 18, 10][window as usize] + delay;
             for i in 0..count {
                 let n = name_start + rate * i;
-                if self.first_line && n < 106 {
-                    self.slots[n] = Slot::PfLoad(i as u8);
+                if self.first_line {
+                    self.place(n, Slot::PfLoad(i as u8), Slot::PfLoadVirtual(i as u8));
                 }
-                let d = n + 3;
-                if d < 106 {
-                    self.slots[d] = Slot::PfChar(i as u8);
-                }
+                self.place(n + 3, Slot::PfChar(i as u8), Slot::PfCharVirtual(i as u8));
             }
         } else if self.first_line {
             let start = [0usize, 28, 20, 12][window as usize] + delay;
             for i in 0..count {
                 let c = start + rate * i;
-                if c < 106 {
-                    self.slots[c] = Slot::PfLoad(i as u8);
-                }
+                self.place(c, Slot::PfLoad(i as u8), Slot::PfLoadVirtual(i as u8));
             }
         }
+    }
+
+    /// Put a playfield fetch on cycle `c`: on the bus before the hardware
+    /// stop at 106, virtual from there to the end of the line.
+    fn place(&mut self, c: usize, real: Slot, virt: Slot) {
+        if c < 106 {
+            self.slots[c] = real;
+        } else if c < CYCLES_PER_LINE as usize {
+            self.slots[c] = virt;
+        }
+    }
+
+    /// Row counter within the current mode line.
+    pub fn row(&self) -> u8 {
+        self.row
     }
 
     /// The planned slot for cycle `c` of the current line.
@@ -539,6 +564,22 @@ mod tests {
         // Second line: the JVB, one instruction byte and two address bytes.
         assert_eq!(busy[1], 3 + 9);
         assert_eq!(a.dlist, 0x1000);
+    }
+
+    #[test]
+    fn a_wide_mode_e_line_advances_48_bytes_though_one_fetch_is_virtual() {
+        // Wide mode E: fetches at 12, 14, ... 106. The last is past the
+        // hardware stop, so 47 reach the bus, but the scan counter moves 48.
+        let mut mem = Box::new([0u8; 0x10000]);
+        mem[0x1000..0x1006].copy_from_slice(&[0x4e, 0x00, 0x20, 0x41, 0x00, 0x10]);
+        let mut a = Antic::new();
+        a.dmactl = 0x23;
+        a.dlist = 0x1000;
+        a.vline = DISPLAY_START;
+        a.begin_line();
+        let busy = run_lines(&mut a, &mem, 1);
+        assert_eq!(busy[0], 3 + 47 + 9);
+        assert_eq!(a.memscan, 0x2030);
     }
 
     #[test]
