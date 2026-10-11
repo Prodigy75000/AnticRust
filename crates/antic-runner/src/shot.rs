@@ -5,10 +5,14 @@
 //!
 //!   shot <cart> [--frames N] [--out file.png] [--map mirror|one|two|linear|bob]
 //!               [--press KEY@FRAME[+LEN]] [--every K] [--wav file.wav]
+//!               [--hle] [--state file.state] [--colors]
 //!
 //! KEY is start, pause, reset, star, hash, 0-9, fire or top (controller 1).
 //! With --every K, frame N-1, N-1-K, ... are all written, suffixed.
 //! Output defaults to out/shot.png (gitignored).
+//! --state loads a save state first (on the HLE, which is what the app runs),
+//! so N frames are played from it: use --frames 1 to redraw it. --colors
+//! prints how many pixels of the last frame carry each colour byte.
 
 use antic_core::cart::{Cart, Mapping};
 use antic_core::gtia::{HEIGHT, WIDTH};
@@ -64,6 +68,9 @@ fn main() {
     let mut every = 0u64;
     let mut wav: Option<PathBuf> = None;
     let mut audio: Vec<i16> = Vec::new();
+    let mut hle = false;
+    let mut state: Option<PathBuf> = None;
+    let mut colors = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -71,6 +78,9 @@ fn main() {
             "--out" => { i += 1; out = PathBuf::from(&args[i]); }
             "--every" => { i += 1; every = args[i].parse().expect("every"); }
             "--wav" => { i += 1; wav = Some(PathBuf::from(&args[i])); }
+            "--hle" => hle = true,
+            "--colors" => colors = true,
+            "--state" => { i += 1; state = Some(PathBuf::from(&args[i])); hle = true; }
             "--map" => {
                 i += 1;
                 map = Some(match args[i].as_str() {
@@ -97,12 +107,15 @@ fn main() {
     }
     let cart_path = cart_path.expect("usage: shot <cart> [options]");
     let rom = std::fs::read(&cart_path).expect("read cart");
-    let bios = std::fs::read(root.join("bios/[BIOS] Atari 5200 (USA).a52")).expect("read bios");
+    let bios = if hle { None } else { Some(std::fs::read(root.join("bios/[BIOS] Atari 5200 (USA).a52")).expect("read bios")) };
     let cart = match map {
         Some(m) => Cart::new(rom, m).expect("mapping"),
         None => Cart::identified(rom).expect("mapping"),
     };
-    let mut m = Machine::new(cart, Some(&bios));
+    let mut m = Machine::new(cart, bios.as_deref());
+    if let Some(p) = &state {
+        m.load_state(&std::fs::read(p).expect("read state")).expect("load state");
+    }
     // Sticks powered and centred is what a controller at rest reports.
     std::fs::create_dir_all(out.parent().unwrap()).ok();
     for f in 0..frames {
@@ -131,6 +144,17 @@ fn main() {
         let peak = audio.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
         let rms = (audio.iter().map(|&v| (v as f64).powi(2)).sum::<f64>() / audio.len().max(1) as f64).sqrt();
         println!("wrote {} ({} samples, peak {peak}, rms {rms:.0})", w.display(), audio.len());
+    }
+    if colors {
+        let mut n = [0usize; 256];
+        for &c in &m.bus.gtia.frame {
+            n[c as usize] += 1;
+        }
+        let pal = antic_core::gtia::palette();
+        for (c, &k) in n.iter().enumerate().filter(|(_, &k)| k > 0) {
+            let [r, g, b] = pal[c];
+            println!("{c:02x}  {k:6} px  rgb {r:3} {g:3} {b:3}");
+        }
     }
     println!("wrote {} ({WIDTH}x{HEIGHT})", out.display());
 }

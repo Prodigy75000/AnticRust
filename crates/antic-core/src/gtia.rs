@@ -425,27 +425,59 @@ fn playfield(a: &Antic, prior: u8, cc: u16) -> (Pf, Pf) {
     }
 }
 
-/// NTSC palette: colour byte to RGB, from Altirra appendix D's model. Hue 0
-/// is grey; hues 1-15 step 25.7 degrees from hue 1 at -57 degrees in I-Q
-/// space, saturation 24% of the luma range. Luminance is bits 1-3 (bit 0 is
-/// ignored outside the GTIA modes, as on hardware).
+/// NTSC palette: colour byte to RGB.
+///
+/// This is the table the a5200 libretro core uses (libretro/a5200,
+/// libretro/libretro.c, a5200_palette_ntsc), taken as is so that a game looks
+/// the same here as in the core people compare us against. It is a fixed
+/// table rather than a model, and it follows the hue names in
+/// the GTIA documentation: hue 1 gold, A turquoise, C green, D yellow-green,
+/// F light orange.
+///
+/// It replaces a generated YIQ model (hue 1 at -57 degrees, 25.7 degree
+/// steps), which was close to atari800's own model and came out dull and
+/// shifted next to a5200: Pole Position's sky () was pale blue rather
+/// than turquoise, its text () blue rather than green, and its grass
+/// () green rather than yellow-green.
+const NTSC: [u32; 256] = [
+    0x000000, 0x252525, 0x343434, 0x4f4f4f, 0x5b5b5b, 0x696969, 0x7b7b7b, 0x8a8a8a,
+    0xa7a7a7, 0xb9b9b9, 0xc5c5c5, 0xd0d0d0, 0xd7d7d7, 0xe1e1e1, 0xf4f4f4, 0xffffff,
+    0x4c3200, 0x623a00, 0x7b4a00, 0x9a6000, 0xb57400, 0xcc8500, 0xe79e08, 0xf7af10,
+    0xffc318, 0xffd020, 0xffd828, 0xffdf30, 0xffe63b, 0xfff440, 0xfffa4b, 0xffff50,
+    0x992500, 0xaa2500, 0xb42500, 0xd33000, 0xdd4802, 0xe25009, 0xf46700, 0xf47510,
+    0xff9e10, 0xffac20, 0xffba3a, 0xffbf50, 0xffc66d, 0xffd580, 0xffe490, 0xffe699,
+    0x980c0c, 0x990c0c, 0xc21300, 0xd31300, 0xe23500, 0xe34000, 0xe44020, 0xe55230,
+    0xfd7854, 0xff8a6a, 0xff987c, 0xffa48b, 0xffb39e, 0xffc2b2, 0xffd0ba, 0xffd7c0,
+    0x990000, 0xa90000, 0xc20400, 0xd30400, 0xda0400, 0xdb0800, 0xe42020, 0xf64040,
+    0xfb7070, 0xfb7e7e, 0xfb8f8f, 0xff9f9f, 0xffabab, 0xffb9b9, 0xffc9c9, 0xffcfcf,
+    0x7e0050, 0x800050, 0x80005f, 0x950b74, 0xaa2288, 0xbb2f9a, 0xce3fad, 0xd75ab6,
+    0xe467c3, 0xef72ce, 0xfb7eda, 0xff8de1, 0xff9de5, 0xffa5e7, 0xffafea, 0xffb8ec,
+    0x48006c, 0x5c0488, 0x650d90, 0x7b23a7, 0x933bbf, 0x9d45c9, 0xa74fd3, 0xb25ade,
+    0xbd65e9, 0xc56df1, 0xce76fa, 0xd583ff, 0xda90ff, 0xde9cff, 0xe2a9ff, 0xe6b6ff,
+    0x1b0070, 0x221b8d, 0x3730a2, 0x4841b3, 0x5952c4, 0x635cce, 0x6f68da, 0x7d76e8,
+    0x8780f8, 0x938cff, 0x9d97ff, 0xa8a3ff, 0xb3afff, 0xbcb8ff, 0xc4c1ff, 0xdad1ff,
+    0x000d7f, 0x0012a7, 0x0018c0, 0x0a2bd1, 0x1b4ae3, 0x2f58f0, 0x3768ff, 0x4979ff,
+    0x5b85ff, 0x6d96ff, 0x7fa3ff, 0x8cadff, 0x96b4ff, 0xa8c0ff, 0xb7cbff, 0xc6d6ff,
+    0x00295a, 0x003876, 0x004892, 0x005cac, 0x0071c6, 0x0086d0, 0x0a9bdf, 0x1aa8ec,
+    0x2bb6ff, 0x3fc2ff, 0x45cbff, 0x59d3ff, 0x7fdaff, 0x8fdeff, 0xa0e2ff, 0xb0ebff,
+    0x004a00, 0x004c00, 0x006a20, 0x508e79, 0x409999, 0x009caa, 0x00a1bb, 0x01a4cc,
+    0x03a5d7, 0x05dae2, 0x18e5ff, 0x34eaff, 0x49efff, 0x66f2ff, 0x84f4ff, 0x9ef9ff,
+    0x004a00, 0x005d00, 0x007000, 0x008300, 0x009500, 0x00ab00, 0x07bd07, 0x0ad00a,
+    0x1ad540, 0x5af177, 0x82efa7, 0x84edd1, 0x89ffed, 0x7dffff, 0x93ffff, 0x9bffff,
+    0x224a03, 0x275304, 0x306405, 0x3c770c, 0x458c11, 0x5aa513, 0x1bd209, 0x1fdd00,
+    0x3dcd2d, 0x3dcd30, 0x58cc40, 0x60d350, 0xa2ec55, 0xb3f24a, 0xbbf65d, 0xc4f870,
+    0x2e3f0c, 0x364a0f, 0x405615, 0x465f17, 0x57771a, 0x65851c, 0x74931d, 0x8fa525,
+    0xadb72c, 0xbcc730, 0xc9d533, 0xd4e03b, 0xe0ec42, 0xeaf645, 0xf0fd47, 0xf4ff6f,
+    0x552400, 0x5a2c00, 0x6c3b00, 0x794b00, 0xb97500, 0xbb8500, 0xc1a120, 0xd0b02f,
+    0xdebe3f, 0xe6c645, 0xedcd57, 0xf5db62, 0xfbe569, 0xfcee6f, 0xfdf377, 0xfdf37f,
+    0x5c2700, 0x5c2f00, 0x713b00, 0x7b4800, 0xb96820, 0xbb7220, 0xc58629, 0xd79633,
+    0xe6a440, 0xf4b14b, 0xfdc158, 0xffcc55, 0xffd461, 0xffdd69, 0xffe679, 0xffea98,
+];
+
 pub fn palette() -> [[u8; 3]; 256] {
     let mut p = [[0u8; 3]; 256];
-    for (c, out) in p.iter_mut().enumerate() {
-        let hue = (c >> 4) as f64;
-        let lum = (c & 0x0f) as f64;
-        let y = lum / 15.0;
-        let (i, q) = if hue == 0.0 {
-            (0.0, 0.0)
-        } else {
-            let ang = (-57.0 + 25.7 * (hue - 1.0)).to_radians();
-            (0.24 * ang.cos(), 0.24 * ang.sin())
-        };
-        let r = y + 0.956 * i + 0.621 * q;
-        let g = y - 0.272 * i - 0.647 * q;
-        let b = y - 1.107 * i + 1.704 * q;
-        let to8 = |v: f64| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-        *out = [to8(r), to8(g), to8(b)];
+    for (out, &v) in p.iter_mut().zip(NTSC.iter()) {
+        *out = [(v >> 16) as u8, (v >> 8) as u8, v as u8];
     }
     p
 }
@@ -493,8 +525,24 @@ mod tests {
         let p = palette();
         assert_eq!(p[0x00], [0, 0, 0]);
         assert_eq!(p[0x0f], [255, 255, 255]);
-        let [r, g, b] = p[0x08];
-        assert!(r == g && g == b && r > 100 && r < 160);
-        assert_ne!(p[0x48][0], p[0x48][2], "a hue is not grey");
+        for c in 0..16 {
+            let [r, g, b] = p[c];
+            assert!(r == g && g == b, "hue 0 is grey at {c:02x}");
+        }
+        for c in 1..16 {
+            assert!(p[c][0] > p[c - 1][0], "grey rises at {c:02x}");
+        }
+    }
+
+    #[test]
+    fn hues_follow_the_gtia_names_on_pole_positions_colours() {
+        // The three colours that looked wrong next to a5200 in Pole Position.
+        // The old YIQ model fails every one of these.
+        let p = palette();
+        assert_eq!(p[0xaa], [0x18, 0xe5, 0xff], "sky: turquoise");
+        assert_eq!(p[0xa2], [0x00, 0x6a, 0x20], "text: dark green");
+        assert_eq!(p[0xd8], [0xad, 0xb7, 0x2c], "grass: yellow-green");
+        let [r, g, b] = p[0x18];
+        assert!(r > g && g > b && b < 64, "hue 1 is gold");
     }
 }

@@ -307,6 +307,27 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     (*info).block_extract = false;
 }
 
+/// The part of the frame the frontend is shown: colour clocks $30-$D0 (the
+/// normal playfield) and 224 lines, centred in the 384x240 the core draws.
+/// The same window as a5200. Games park players and missiles just outside
+/// what a TV shows; the full wide-playfield frame showed them as stray blocks
+/// at the right edge of Pole Position.
+const VIEW_W: usize = 320;
+const VIEW_H: usize = 224;
+const VIEW_X: usize = (WIDTH - VIEW_W) / 2;
+const VIEW_Y: usize = (HEIGHT - VIEW_H) / 2;
+
+/// Copy the visible window of a frame of colour bytes out as XRGB8888.
+fn view(frame: &[u8], pal: &[[u8; 3]; 256], out: &mut [u32]) {
+    for (y, row) in out.chunks_exact_mut(VIEW_W).enumerate() {
+        let src = &frame[(VIEW_Y + y) * WIDTH + VIEW_X..][..VIEW_W];
+        for (o, &ci) in row.iter_mut().zip(src) {
+            let [r, g, b] = pal[ci as usize];
+            *o = (r as u32) << 16 | (g as u32) << 8 | b as u32;
+        }
+    }
+}
+
 /// 1.79 MHz over 114 cycles a line and 262 lines: 59.92 Hz.
 fn fps() -> f64 {
     antic_core::CPU_HZ as f64 / (114.0 * 262.0)
@@ -318,12 +339,12 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
         return;
     }
     (*info).geometry = RetroGameGeometry {
-        base_width: WIDTH as c_uint,
-        base_height: HEIGHT as c_uint,
-        max_width: WIDTH as c_uint,
-        max_height: HEIGHT as c_uint,
+        base_width: VIEW_W as c_uint,
+        base_height: VIEW_H as c_uint,
+        max_width: VIEW_W as c_uint,
+        max_height: VIEW_H as c_uint,
         // A hi-res pixel is 0.857 as wide as tall on NTSC (Altirra 4.2).
-        aspect_ratio: (WIDTH as f32 * 0.857) / HEIGHT as f32,
+        aspect_ratio: (VIEW_W as f32 * 0.857) / VIEW_H as f32,
     };
     (*info).timing = RetroSystemTiming { fps: fps(), sample_rate: SAMPLE_RATE as f64 };
 }
@@ -363,7 +384,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             return false;
         }
     }
-    CORE = Some(Core { machine, rom, pal: palette(), video: vec![0; WIDTH * HEIGHT], stereo: Vec::new() });
+    CORE = Some(Core { machine, rom, pal: palette(), video: vec![0; VIEW_W * VIEW_H], stereo: Vec::new() });
     if let Some(env) = ENVIRON {
         set_input_descriptors(env);
         set_memory_maps(env);
@@ -510,12 +531,9 @@ pub unsafe extern "C" fn retro_run() {
         }
     }
     c.machine.run_frame();
-    for (out, &ci) in c.video.iter_mut().zip(c.machine.bus.gtia.frame.iter()) {
-        let [r, g, b] = c.pal[ci as usize];
-        *out = (r as u32) << 16 | (g as u32) << 8 | b as u32;
-    }
+    view(&c.machine.bus.gtia.frame, &c.pal, &mut c.video);
     if let Some(video) = VIDEO {
-        video(c.video.as_ptr() as *const c_void, WIDTH as c_uint, HEIGHT as c_uint, WIDTH * 4);
+        video(c.video.as_ptr() as *const c_void, VIEW_W as c_uint, VIEW_H as c_uint, VIEW_W * 4);
     }
     // POKEY is mono; the frontend takes stereo frames.
     let mono = c.machine.bus.pokey.take_samples();
@@ -820,6 +838,34 @@ mod tests {
             retro_unload_game();
             assert_eq!(retro_serialize_size(), 0, "no game, no state");
         }
+    }
+
+    #[test]
+    fn the_frontend_sees_the_normal_playfield_and_not_the_parked_objects() {
+        // Mark columns in the 384-wide frame and see which survive.
+        let mut frame = vec![0u8; WIDTH * HEIGHT];
+        let mut pal = [[0u8; 3]; 256];
+        for c in 0..256 {
+            pal[c] = [c as u8, 0, 0];
+        }
+        for y in 0..HEIGHT {
+            frame[y * WIDTH + 31] = 1; // colour clock $2F: outside
+            frame[y * WIDTH + 32] = 2; // $30: the first visible
+            frame[y * WIDTH + 351] = 3; // $CF: the last visible
+            frame[y * WIDTH + 376] = 4; // $DC: Pole Position's blocks
+        }
+        frame[7 * WIDTH + 100] = 5; // line 15: above
+        frame[8 * WIDTH + 100] = 6; // line 16: the first visible
+        frame[231 * WIDTH + 100] = 7; // line 239: the last visible
+        frame[232 * WIDTH + 100] = 8; // line 240: below
+        let mut out = vec![0u32; 320 * 224];
+        view(&frame, &pal, &mut out);
+        let seen: std::collections::BTreeSet<u32> = out.iter().map(|v| v >> 16).collect();
+        assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![0, 2, 3, 6, 7]);
+        assert_eq!(out[0] >> 16, 2);
+        assert_eq!(out[319] >> 16, 3);
+        assert_eq!(out[68] >> 16, 6);
+        assert_eq!(out[223 * 320 + 68] >> 16, 7);
     }
 
     #[test]
