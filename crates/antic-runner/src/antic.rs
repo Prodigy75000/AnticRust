@@ -30,5 +30,5 @@ fn main() {
     println!("  RAM           {:>9} bytes", RAM);
     println!("  BIOS window   {:>9} bytes", BIOS_SIZE);
     println!();
-    println!("No CPU, no ANTIC, no GTIA, no POKEY, no HLE. Nothing to run.");
+    println!("CPU: green (bins tomharte, klaus). No ANTIC, GTIA, POKEY or HLE yet.");
 }

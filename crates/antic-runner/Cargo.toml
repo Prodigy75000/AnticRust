@@ -13,3 +13,18 @@ path = "src/antic.rs"
 
 [dependencies]
 antic-core = { path = "../antic-core" }
+# tomharte harness only: parse the SingleStepTests JSON (optionally gzipped).
+# Dev-tool deps; the core and the shipped libretro cdylib pull in neither.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+flate2 = "1"
+
+# CPU conformance: TomHarte single-step vectors (NMOS 6502, decimal on).
+[[bin]]
+name = "tomharte"
+path = "src/tomharte.rs"
+
+# CPU conformance: Klaus Dormann's functional test, decimal tests included.
+[[bin]]
+name = "klaus"
+path = "src/klaus.rs"

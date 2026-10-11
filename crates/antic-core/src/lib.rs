@@ -51,6 +51,9 @@
 //! extremes will feel wrong and will also be wrong, and "centre" is a value the
 //! hardware never reliably returns on its own.
 
+pub mod cpu;
+pub mod save;
+
 /// 6502C "SALLY" clock, 1.79 MHz NTSC.
 pub const CPU_HZ: u32 = 1_789_773;
 
