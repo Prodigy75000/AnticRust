@@ -1,0 +1,15 @@
+[package]
+name = "antic-runner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Dev harnesses for AnticRust: test-ROM runs, headless renders, and HLE-versus-real-BIOS differential runs."
+
+[[bin]]
+name = "antic"
+path = "src/antic.rs"
+
+[dependencies]
+antic-core = { path = "../antic-core" }

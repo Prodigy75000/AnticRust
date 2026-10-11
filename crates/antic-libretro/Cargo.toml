@@ -1,0 +1,16 @@
+[package]
+name = "antic-libretro"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "libretro core for AnticRust. Publishes SET_MEMORY_MAPS and SYSTEM_RAM, and loads content only from the frontend, so RetroAchievements can hash and read it."
+
+[lib]
+# cdylib -> libanticrust_libretro.so / anticrust_libretro.dll / .dylib
+name = "anticrust_libretro"
+crate-type = ["cdylib"]
+
+[dependencies]
+antic-core = { path = "../antic-core" }

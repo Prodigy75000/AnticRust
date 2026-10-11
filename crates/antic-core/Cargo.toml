@@ -1,0 +1,15 @@
+[package]
+name = "antic-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "AnticRust: a clean-room Atari 5200 core in Rust, with an HLE BIOS so no firmware dump is needed."
+
+[lib]
+name = "antic_core"
+path = "src/lib.rs"
+
+# Deliberately empty: anything here also lands in the shipped libretro cdylib.
+[dependencies]

@@ -1,0 +1,22 @@
+# AnticRust: a clean-room Atari 5200 emulator core, written from scratch in
+# Rust, with an HLE BIOS and a memory map RetroAchievements can actually use.
+#
+# Named for ANTIC, the display-list processor the 5200 shares with every Atari
+# 8-bit machine, so the name still fits if the 400/800 are ever folded in.
+#
+# Standalone workspace, like RustStation, CubeRust, ColecoRust and IntelliRust.
+[workspace]
+resolver = "2"
+members = ["crates/antic-core", "crates/antic-libretro", "crates/antic-runner"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Prodigy75000/AnticRust"
+authors = ["Prodigy75000"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
