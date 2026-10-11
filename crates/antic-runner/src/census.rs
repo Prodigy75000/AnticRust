@@ -3,7 +3,7 @@
 
 //! `census`: what does each cartridge actually use of the real BIOS?
 //!
-//!   census [--dir <folder>] [--frames N] [--out <file>]
+//!   census [--dir <folder>] [--frames N] [--out <file>] [--input]
 //!
 //! Every title runs on the real BIOS with no input, and a probe sees every
 //! bus cycle. Per title it records:
@@ -33,6 +33,7 @@
 
 use antic_core::cart::{Cart, Mapping};
 use antic_core::machine::{Access, AccessKind, Machine, Probe};
+use antic_core::pokey::Key;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -98,6 +99,11 @@ struct Census {
     entered: Option<u64>,
     wait_start: Option<u64>,
     last_fetch: u16,
+    /// Opcode of the previous instruction, to tell a return from a call.
+    last_op: u8,
+    /// RTI/RTS landing in the BIOS: resuming an interrupted BIOS
+    /// instruction (an NMI taken right after an IRQ entry, say), not a call.
+    returns_into_bios: u64,
     pending_vector: Option<u16>,
     calls: BTreeMap<u16, u64>,
     vectors: BTreeMap<u16, u64>,
@@ -126,6 +132,8 @@ impl Census {
             entered: None,
             wait_start: None,
             last_fetch: 0,
+            last_op: 0,
+            returns_into_bios: 0,
             pending_vector: None,
             calls: BTreeMap::new(),
             vectors: BTreeMap::new(),
@@ -160,7 +168,9 @@ impl Census {
             }
             AccessKind::Fetch => {
                 let from = self.last_fetch;
+                let from_op = self.last_op;
                 self.last_fetch = a.addr;
+                self.last_op = a.value;
                 if self.wait_start.is_none() && a.addr == WAIT_LOOP {
                     self.wait_start = Some(a.cycle);
                 }
@@ -182,6 +192,8 @@ impl Census {
                 if let Some(v) = self.pending_vector.take() {
                     // First fetch after an interrupt entry: the handler.
                     *self.vectors.entry(v).or_default() += 1;
+                } else if in_bios(a.addr) && !in_bios(from) && matches!(from_op, 0x40 | 0x60) {
+                    self.returns_into_bios += 1;
                 } else if in_bios(a.addr) && !in_bios(from) {
                     *self.calls.entry(a.addr).or_default() += 1;
                 } else if !in_bios(a.addr) && in_bios(from) {
@@ -264,7 +276,31 @@ struct Outcome {
     c: Census,
 }
 
-fn run(path: &Path, mapping: Mapping, bios: &[u8], frames: u64) -> Outcome {
+/// The scripted input: the same for every title, a 240-frame cycle from frame
+/// 300 (after the longest boot). Start once, fire twice, the top button,
+/// keypad 1, and the stick sweeping both axes through its range throughout.
+/// Generic on purpose: it is a coverage probe, not a play-through.
+fn script(m: &mut Machine, f: u64) {
+    if f < 300 {
+        return;
+    }
+    let phase = (f - 300) % 240;
+    let c = &mut m.bus.pokey.controllers[0];
+    c.key = match phase {
+        60..=67 => Some(Key::Start),
+        200..=207 => Some(Key::Digit(1)),
+        _ => None,
+    };
+    c.top = (170..178).contains(&phase);
+    let t = f as f64;
+    c.pot = [
+        (114.0 + 110.0 * (t / 40.0).sin()).round().clamp(1.0, 228.0) as u8,
+        (114.0 + 110.0 * (t / 57.0).cos()).round().clamp(1.0, 228.0) as u8,
+    ];
+    m.bus.gtia.trigger[0] = (120..130).contains(&phase) || (150..160).contains(&phase);
+}
+
+fn run(path: &Path, mapping: Mapping, bios: &[u8], frames: u64, input: bool) -> Outcome {
     let rom = std::fs::read(path).expect("read cart");
     let skip = rom.len() >= 3 && rom[rom.len() - 3] == 0xff;
     let cart = Cart::new(rom, mapping).expect("mapping");
@@ -272,7 +308,10 @@ fn run(path: &Path, mapping: Mapping, bios: &[u8], frames: u64) -> Outcome {
     let mut m = Machine::new(cart, Some(bios));
     // Attached after reset: the census starts at the first instruction.
     m.bus.probe = Some(Box::new(Shared(census.clone())));
-    for _ in 0..frames {
+    for f in 0..frames {
+        if input {
+            script(&mut m, f);
+        }
         m.run_frame();
         if m.cpu.halted {
             break;
@@ -295,6 +334,7 @@ fn main() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut dir = root.join("dumps/Atari 5200 ROM Collection/Commerical Games (1982-1984)");
     let mut frames = 1800u64;
+    let mut input = false;
     let mut out = root.join("out/census.txt");
     let mut i = 0;
     while i < args.len() {
@@ -307,6 +347,7 @@ fn main() {
                 i += 1;
                 frames = args[i].parse().expect("frames");
             }
+            "--input" => input = true,
             "--out" => {
                 i += 1;
                 out = PathBuf::from(&args[i]);
@@ -341,7 +382,7 @@ fn main() {
         hs.push(std::thread::spawn(move || loop {
             let job = jobs.lock().unwrap().pop();
             let Some((idx, (path, m))) = job else { break };
-            let o = run(&path, m, &bios, frames);
+            let o = run(&path, m, &bios, frames, input);
             results.lock().unwrap().push((idx, o));
         }));
     }
@@ -353,7 +394,7 @@ fn main() {
 
     let mut r = String::new();
     let fr = |cyc: u64| cyc as f64 / CYCLES_PER_FRAME;
-    writeln!(r, "BIOS census: {} runs over {} files in {}, {frames} frames each, no input", results.len(), files.len(), dir.display()).unwrap();
+    writeln!(r, "BIOS census: {} runs over {} files in {}, {frames} frames each, {}", results.len(), files.len(), dir.display(), if input { "scripted input (start, fire, top, keypad 1, stick sweep)" } else { "no input" }).unwrap();
     for (name, len) in &unsupported {
         writeln!(r, "UNSUPPORTED SIZE: {name} ({len} bytes)").unwrap();
     }

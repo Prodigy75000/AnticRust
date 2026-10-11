@@ -14,7 +14,8 @@ publish.
 
 Read the numbers with these limits in mind:
 
-- **No input, attract mode only.** Nothing presses a key, so keypad IRQs and
+- **No input, attract mode only** (in the first run; see "With scripted input"
+  below for the second). Nothing presses a key, so keypad IRQs and
   game-play code paths are not exercised. The IRQ vector count below is zero
   for that reason. It is not a finding that games never use IRQs. A re-run
   with scripted input is owed.
@@ -136,6 +137,45 @@ directly, through DMA.
   - CHBASE = $F8: 6;
   - SKCTL = $02: 3.
 
+## With scripted input
+
+`census --input --frames 3600` drives the same generic script for every
+title: a 240-frame cycle from frame 300 that presses Start, the fire button
+twice, the top button and keypad 1, while the stick sweeps both axes through
+its range. It is a coverage probe, not a play-through. It answers the
+first limit listed above:
+
+| | no input | scripted input |
+|---|---|---|
+| take the IRQ vector | 0 | **54** |
+| BIOS instructions run after entry (union) | 70 | **124** |
+| read the BIOS pot shadows $11/$12 | 15 / 10 | **33 / 31** |
+| BIOS writes IRQEN after entry (IRQ acknowledge) | 0 | 38 |
+
+The IRQ side of the BIOS turns out to be the second large interface:
+
+| BIOS exit | meaning | titles |
+|---|---|---|
+| $FD10 | `JMP ($020A)` after the BIOS keypad routine at $FD02 decoded KBCODE through its table | 34 |
+| $FC00 | `JMP ($0200)`, the cart replaces the whole IRQ handler | 17 |
+| $FC92 | `JMP ($020C)` after the top-button (break) IRQ is acknowledged | 17 |
+| $FC9F | into `JMP ($0208)`, the keypad vector, after the keypad IRQ is acknowledged | 4 |
+
+New direct entries:
+- **Zaxxon jumps to the BIOS reset routine, $FD23**, once in the run.
+- **Blueprint jumps into the BIOS VBI at $FCBD every frame** (under the
+  one-chip mapping that the census selected for it).
+
+Two measurement corrections came out of this run:
+- **An RTI or RTS that lands in the BIOS is now counted apart from calls.**
+  It is a resumed BIOS instruction, typically an NMI taken in the one
+  instruction between an IRQ entry and the first instruction of its handler.
+  Before the fix, 37 titles appeared to "call" $FC00.
+- **A BRK reads its vector as an ordinary load**, so a run that executes BRK
+  shows $FC00 as a call target. Under the best mapping only Atari Diagnostics
+  does that, which is presumably deliberate (7 BRKs). The rest were
+  wrong-mapping runs.
+
 ## What this says about the HLE
 
 The intercept is **both**, as ColecoRust found for its machine, and for the
@@ -143,8 +183,14 @@ same kind of reason:
 
 1. **The BIOS's code addresses are an interface.** Vectors point at them,
    14 titles jump to $FCB2, and 4 titles copy a table of pointers to them.
-   The NMI dispatcher, the VBI with its shadow copies, the default DLI handler
-   and that table must exist at the same addresses.
+   The following must exist at the same addresses:
+   - the NMI dispatcher;
+   - the VBI with its shadow copies;
+   - the default DLI handler;
+   - the IRQ dispatcher and the keypad decode routine at $FD02 (with its
+     table), which 34 titles use;
+   - the reset entry at $FD23;
+   - the vector table.
 2. **The font is data that 43 titles display and 21 copy.** It needs a font
    in the same character order at $F800. That means a clean-room font drawn
    for this project, which will look different from the original. **Whether
