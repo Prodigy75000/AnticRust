@@ -56,3 +56,13 @@ path = "src/shot.rs"
 [[bin]]
 name = "dlist"
 path = "src/dlist.rs"
+
+# The state the real BIOS hands a cartridge: what an HLE boot synthesises.
+[[bin]]
+name = "entrystate"
+path = "src/entrystate.rs"
+
+# The real BIOS against the HLE, title by title: the oracle as a harness.
+[[bin]]
+name = "hlediff"
+path = "src/hlediff.rs"

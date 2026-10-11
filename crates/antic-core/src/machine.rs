@@ -81,11 +81,13 @@ pub struct Bus {
 
 impl Bus {
     fn new(cart: Cart, bios: Option<&[u8]>) -> Self {
-        let bios = bios.map(|b| {
-            let mut img = Box::new([0u8; 0x800]);
-            img.copy_from_slice(&b[b.len() - 0x800..]);
-            img
-        });
+        // No dump: the HLE image. A dump is the oracle, never a requirement.
+        let mut img = Box::new([0u8; 0x800]);
+        match bios {
+            Some(b) => img.copy_from_slice(&b[b.len() - 0x800..]),
+            None => *img = crate::hle::image(),
+        }
+        let bios = Some(img);
         let mut antic = Antic::new();
         antic.begin_line();
         Bus {
@@ -283,8 +285,8 @@ pub struct Machine {
 }
 
 impl Machine {
-    /// A machine with this cartridge. With `bios` None there is no firmware
-    /// at all yet: the HLE is still to come, so only a real dump boots.
+    /// A machine with this cartridge. With `bios` None it runs the HLE image
+    /// (`hle.rs`); a real dump is for differential testing.
     pub fn new(cart: Cart, bios: Option<&[u8]>) -> Self {
         let mut m = Machine { cpu: Cpu::new(), bus: Bus::new(cart, bios) };
         m.reset();

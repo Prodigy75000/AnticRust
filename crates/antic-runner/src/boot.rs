@@ -3,7 +3,13 @@
 
 //! `boot`: run a cartridge on the real BIOS and say what happened.
 //!
-//!   boot <cart> [--bios <file>] [--frames N] [--map mirror|one|two|linear|bob]
+//!   boot <cart> [--bios <file>|--hle] [--frames N] [--map ...] [--script]
+//!
+//! --dump ADDR LEN prints memory at the end of the run.
+//!
+//! --script drives the census's generic input (Start, fire, top, keypad 1,
+//! stick sweep, a 240-frame cycle from frame 300). If the CPU jams, the run
+//! stops there and the report shows the jam address and how it got there.
 //!
 //! Reports the first instruction fetched from the cartridge window and when,
 //! then what the CPU spent the last frame executing (a PC histogram with
@@ -46,11 +52,24 @@ fn main() {
     let mut bios_path = String::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../bios/[BIOS] Atari 5200 (USA).a52"));
     let mut frames = 300u64;
     let mut map = None;
+    let mut dump: Option<(u16, usize)> = None;
+    let mut script = false;
+    let mut script_from = 300u64;
+    let mut hle = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--bios" => { i += 1; bios_path = args[i].clone(); }
             "--frames" => { i += 1; frames = args[i].parse().expect("frames"); }
+            "--script" => script = true,
+            "--dump" => {
+                let a = u16::from_str_radix(args[i + 1].trim_start_matches('$'), 16).expect("hex");
+                let n = args[i + 2].parse().expect("len");
+                dump = Some((a, n));
+                i += 2;
+            }
+            "--script-from" => { i += 1; script = true; script_from = args[i].parse().unwrap(); }
+            "--hle" => hle = true,
             "--map" => {
                 i += 1;
                 map = Some(match args[i].as_str() {
@@ -77,14 +96,37 @@ fn main() {
         None => Cart::with_default_mapping(rom).expect("mapping"),
     };
     println!("cart    : {cart_path} ({:?})", cart.mapping);
-    let mut m = Machine::new(cart, Some(&bios));
+    let mut m = Machine::new(cart, if hle { None } else { Some(&bios) });
     let watch = Rc::new(RefCell::new(Watch::default()));
     m.bus.probe = Some(Box::new(Shared(watch.clone())));
+    let mut trail: std::collections::VecDeque<u16> = std::collections::VecDeque::new();
     for f in 0..frames {
         if f + 1 == frames {
             watch.borrow_mut().count = true;
         }
-        m.run_frame();
+        if script {
+            census_script(&mut m, f, script_from);
+        }
+        let end = m.bus.antic.frame;
+        while m.bus.antic.frame == end && !m.cpu.halted {
+            trail.push_back(m.cpu.pc);
+            if trail.len() > 80 {
+                trail.pop_front();
+            }
+            m.step();
+        }
+        if m.cpu.halted {
+            println!("JAMMED in frame {f} at ${:04X}; the last instructions:", m.cpu.pc.wrapping_sub(1));
+            for pc in &trail {
+                let (text, _) = disasm(*pc, |a| m.bus.peek(a).unwrap_or(0xff));
+                println!("    ${pc:04X}  {text}");
+            }
+            break;
+        }
+    }
+    if let Some((a, n)) = dump {
+        let bytes: Vec<String> = (0..n).map(|k| format!("{:02X}", m.bus.peek(a.wrapping_add(k as u16)).unwrap_or(0xff))).collect();
+        println!("dump ${a:04X}: {}", bytes.join(" "));
     }
     let w = watch.borrow();
     match w.first_cart_fetch {
@@ -106,4 +148,26 @@ fn main() {
         let (text, _) = disasm(**pc, |a| m.bus.peek(a).unwrap_or(0xff));
         println!("  {n:>6}  ${pc:04X}  {text}");
     }
+}
+
+/// The census's generic input, kept in step with census.rs.
+fn census_script(m: &mut Machine, f: u64, from: u64) {
+    use antic_core::pokey::Key;
+    if f < from {
+        return;
+    }
+    let phase = (f - from) % 240;
+    let c = &mut m.bus.pokey.controllers[0];
+    c.key = match phase {
+        60..=67 => Some(Key::Start),
+        200..=207 => Some(Key::Digit(1)),
+        _ => None,
+    };
+    c.top = (170..178).contains(&phase);
+    let t = f as f64;
+    c.pot = [
+        (114.0 + 110.0 * (t / 40.0).sin()).round().clamp(1.0, 228.0) as u8,
+        (114.0 + 110.0 * (t / 57.0).cos()).round().clamp(1.0, 228.0) as u8,
+    ];
+    m.bus.gtia.trigger[0] = (120..130).contains(&phase) || (150..160).contains(&phase);
 }
