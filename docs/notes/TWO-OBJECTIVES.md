@@ -99,6 +99,11 @@ that on its machine "skip" really means "synthesise the post-boot state",
 because the firmware does setup the game depends on, and separated the visible
 title screen from the work behind it. Measure that boundary here before asking.
 
+**Settled 2026-10-11: SKIPPED.** The census measured the boundary (4.07
+frames of setup, 254.89 frames of logo; see BIOS-CENSUS.md), and the owner
+confirmed skip. The HLE synthesises the post-boot state and shows no logo;
+there is no option to show one (HLE.md).
+
 ## The method that is worth copying from the siblings
 
 ColecoRust did not start on the HLE. It built an instrument first: a CPU green

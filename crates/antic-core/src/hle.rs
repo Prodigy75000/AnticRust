@@ -28,8 +28,10 @@
 //! Boot: a cart with $BFFD = $FF is entered at once, as on hardware. Any
 //! other cart gets the post-boot state the real BIOS leaves, synthesised
 //! directly from the values `entrystate` measured (identical across all 29
-//! full-boot titles), without the 4.25 s logo. Whether the logo is shown is
-//! the owner's decision and still open.
+//! full-boot titles), without the 4.25 s logo. SKIP is settled (owner,
+//! 2026-10-11): there is no logo. Drawing one would mean reproducing the
+//! firmware's logo screen, which is the firmware's content, and there is no
+//! option to turn it on.
 
 use std::collections::HashMap;
 

@@ -60,9 +60,10 @@ by one makes it report all 29 full-boot titles.
   Anything it randomises plays out differently from a run on the real BIOS.
   That is a different playthrough, not a fault.
 
-Whether the boot should be emulated, skipped or configurable is **the
-owner's decision and still open**. The measurement went to the orchestrator
-on 2026-10-11.
+**Boot is SKIPPED, settled by the owner on 2026-10-11.** There is no logo and
+no option to show one: drawing it would mean reproducing the firmware's logo
+screen. "Skip" here means synthesise the post-boot state, which the
+comparison above shows is exact for everything a game reads.
 
 ## Run-time fidelity: `hlediff --swap`
 
