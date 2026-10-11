@@ -6,8 +6,11 @@
 //! On the 5200 POKEY is the INPUT chip as much as the sound chip: it reads the
 //! analog sticks as pot counters and scans the keypads. Both are modelled here
 //! because both are objective 2 (an achievement set needs controls a person
-//! can work out). Timers run and raise IRQs; audio output is not generated
-//! yet.
+//! can work out). Timers run and raise IRQs, and drive the four audio
+//! channels (Altirra 5.3-5.5): distortion from the 4, 5 and 9/17-bit noise
+//! generators, volume-only mode, the channel 1/2 high-pass flip-flops with
+//! their inversion, and the mixer's saturation. Output is resampled to
+//! [`SAMPLE_RATE`] and AC-coupled, as the hardware is, so silence is zero.
 //!
 //! **The sticks are analog and do not self-centre.** A pot reads the count
 //! POKEY reached when the stick's capacitor charged, 1..228. There is no
@@ -70,6 +73,21 @@ pub const POT_MAX: u8 = 228;
 /// what a frontend reports for a stick at rest.
 pub const POT_CENTRE: u8 = 114;
 
+/// Audio output rate.
+pub const SAMPLE_RATE: u32 = 48_000;
+
+/// The 4-bit and 5-bit noise patterns (Altirra 5.5).
+const POLY4: &[u8; 15] = b"000011101100101";
+const POLY5: &[u8; 31] = b"0000011100100010101111011010011";
+
+/// Mixer output for a summed volume 0..=60. Nearly linear for one channel,
+/// then compressing: two channels at 15 give about 1.5x one channel, all four
+/// about 2x (Altirra 5.3, "Volume control"). The curve 30(1 - 2^(-x/15))
+/// meets those points; it is a fit, not a measurement.
+fn mix_level(sum: u8) -> f32 {
+    30.0 * (1.0 - (2.0f32).powf(-(sum as f32) / 15.0))
+}
+
 pub const IRQ_T1: u8 = 0x01;
 pub const IRQ_T2: u8 = 0x02;
 pub const IRQ_T4: u8 = 0x04;
@@ -102,6 +120,23 @@ pub struct Pokey {
     /// Keypad scan, in scan lines.
     kb_div: u8,
     pub controllers: [Controller; 4],
+    // ---- audio ----
+    /// Cycle position in the 4-bit and 5-bit noise patterns.
+    p4: u8,
+    p5: u8,
+    /// Output flip-flop per channel.
+    ff: [bool; 4],
+    /// High-pass flip-flops for channels 1 and 2.
+    hp: [bool; 2],
+    /// Resampler: summed level over the cycles of the current sample.
+    acc: f32,
+    acc_cycles: u32,
+    frac: u32,
+    /// DC blocker state.
+    dc_prev_in: f32,
+    dc_prev_out: f32,
+    /// Samples produced since the last [`Pokey::take_samples`].
+    pub samples: Vec<i16>,
 }
 
 impl Default for Pokey {
@@ -125,6 +160,16 @@ impl Default for Pokey {
             pot_line_div: 0,
             kb_div: 0,
             controllers: [Controller::default(); 4],
+            p4: 0,
+            p5: 0,
+            ff: [false; 4],
+            hp: [false; 2],
+            acc: 0.0,
+            acc_cycles: 0,
+            frac: 0,
+            dc_prev_in: 0.0,
+            dc_prev_out: 0.0,
+            samples: Vec::new(),
         }
     }
 }
@@ -187,10 +232,12 @@ impl Pokey {
             r @ (0x01 | 0x03 | 0x05 | 0x07) => self.audc[(r >> 1) as usize] = v,
             0x08 => self.audctl = v,
             0x09 => {
-                // STIMER: all channels restart from their periods.
+                // STIMER: all channels restart from their periods, and the
+                // output flip-flops go to 1.
                 for ch in 0..4 {
                     self.counter[ch] = self.period(ch);
                 }
+                self.ff = [true; 4];
             }
             0x0b => {
                 // POTGO
@@ -223,12 +270,18 @@ impl Pokey {
     /// One machine cycle. `line_start` marks cycle 0 of a scan line;
     /// `pots_powered` is GTIA CONSOL bit 2, `selected` its bits 0-1.
     pub fn tick(&mut self, line_start: bool, pots_powered: bool, selected: usize) {
-        // Polynomial counters run every cycle unless SKCTL holds init.
+        // Polynomial counters run every cycle unless SKCTL holds init, which
+        // also holds the 64 kHz and 15 kHz clocks.
         if self.skctl & 3 != 0 {
             let p = self.poly17;
             self.poly17 = (p >> 1) | ((((p << 16) ^ (p << 11)) & 0x10000) & 0x1ffff);
             let q = self.poly9;
             self.poly9 = (q >> 1) | (((q << 8) ^ (q << 3)) & 0x100);
+            self.p4 = (self.p4 + 1) % 15;
+            self.p5 = (self.p5 + 1) % 31;
+        } else {
+            self.div64 = 0;
+            self.div15 = 0;
         }
 
         // Base clocks.
@@ -253,7 +306,6 @@ impl Pokey {
             let fire2 = if link12 { self.clock(1, if fast1 { true } else { slow }, true) } else { self.clock(1, slow, true) };
             let fire3 = self.clock(2, if fast3 { true } else { slow }, !link34);
             let fire4 = if link34 { self.clock(3, if fast3 { true } else { slow }, true) } else { self.clock(3, slow, true) };
-            let _ = fire3;
             if fire1 && !link12 {
                 self.raise(IRQ_T1);
             }
@@ -263,7 +315,20 @@ impl Pokey {
             if fire4 {
                 self.raise(IRQ_T4);
             }
+            for (ch, f) in [fire1, fire2, fire3, fire4].into_iter().enumerate() {
+                if f {
+                    self.clock_output(ch);
+                }
+            }
+            // High-pass: channel 3 clocks channel 1's flip-flop, 4 clocks 2's.
+            if fire3 {
+                self.hp[0] = self.ff[0];
+            }
+            if fire4 {
+                self.hp[1] = self.ff[1];
+            }
         }
+        self.mix();
 
         // Pot scan: slow mode counts once per scan line, fast mode per cycle.
         let pot_tick = if self.skctl & 4 != 0 {
@@ -320,6 +385,72 @@ impl Pokey {
             self.counter[ch] -= 1;
             false
         }
+    }
+
+    /// A timer pulse reaches channel `ch`'s output stage. Noise reaches the
+    /// channels one cycle apart, channel 1 first.
+    fn clock_output(&mut self, ch: usize) {
+        let c = self.audc[ch];
+        let at = |pattern: &[u8], pos: u8| pattern[(pos as usize + pattern.len() - ch) % pattern.len()] == b'1';
+        // Bit 7 clear: the 5-bit generator masks out some pulses.
+        if c & 0x80 == 0 && !at(POLY5, self.p5) {
+            return;
+        }
+        self.ff[ch] = if c & 0x20 != 0 {
+            !self.ff[ch]
+        } else if c & 0x40 != 0 {
+            at(POLY4, self.p4)
+        } else if self.audctl & 0x80 != 0 {
+            self.poly9 >> ch & 1 != 0
+        } else {
+            self.poly17 >> ch & 1 != 0
+        };
+    }
+
+    /// Sum the channels for this cycle and feed the resampler.
+    fn mix(&mut self) {
+        let mut sum = 0u8;
+        for ch in 0..4 {
+            let c = self.audc[ch];
+            let vol = c & 0x0f;
+            if vol == 0 {
+                continue;
+            }
+            let on = if c & 0x10 != 0 {
+                true // volume-only: forced on after the high-pass logic
+            } else if ch < 2 {
+                // XOR with the high-pass flip-flop, which is forced to 1 when
+                // the filter is off: channels 1 and 2 come out inverted.
+                let hp_on = self.audctl & (0x04 >> ch) != 0;
+                self.ff[ch] ^ if hp_on { self.hp[ch] } else { true }
+            } else {
+                self.ff[ch]
+            };
+            if on {
+                sum += vol;
+            }
+        }
+        self.acc += mix_level(sum);
+        self.acc_cycles += 1;
+        self.frac += SAMPLE_RATE;
+        if self.frac >= crate::CPU_HZ {
+            self.frac -= crate::CPU_HZ;
+            let level = self.acc / self.acc_cycles as f32;
+            self.acc = 0.0;
+            self.acc_cycles = 0;
+            // AC coupling: a one-pole high-pass near 20 Hz.
+            let out = level - self.dc_prev_in + 0.9974 * self.dc_prev_out;
+            self.dc_prev_in = level;
+            self.dc_prev_out = out;
+            // Full scale is the mixer's ceiling of 30.
+            let s = (out / 30.0 * 32767.0).clamp(-32768.0, 32767.0);
+            self.samples.push(s as i16);
+        }
+    }
+
+    /// Drain the audio produced so far.
+    pub fn take_samples(&mut self) -> Vec<i16> {
+        std::mem::take(&mut self.samples)
     }
 
     fn raise(&mut self, bit: u8) {
@@ -397,6 +528,76 @@ mod tests {
         }
         let c = fired_at.expect("timer 1 never fired");
         assert!((270..=310).contains(&c), "fired at cycle {c}");
+    }
+
+    /// Frequency of a sample stream by counting rising zero crossings.
+    fn pitch(s: &[i16]) -> f64 {
+        let ups: Vec<usize> = (1..s.len()).filter(|&i| s[i - 1] < 0 && s[i] >= 0).collect();
+        let span = (ups[ups.len() - 1] - ups[0]) as f64;
+        (ups.len() - 1) as f64 * SAMPLE_RATE as f64 / span
+    }
+
+    fn run(p: &mut Pokey, cycles: u32) -> Vec<i16> {
+        for _ in 0..cycles {
+            p.tick(false, true, 0);
+        }
+        p.take_samples()
+    }
+
+    #[test]
+    fn audf_72_pure_tone_on_64khz_plays_437_8_hz() {
+        // Altirra 5.3: AUDF=72 on the 64 kHz clock pulses at 875.6 Hz and
+        // the pure-tone flip-flop halves that to 437.8 Hz.
+        let mut p = Pokey::new();
+        p.skctl = 3;
+        p.write(0x06, 72); // AUDF4
+        p.write(0x07, 0xa8); // AUDC4: pure tone, volume 8
+        let s = run(&mut p, crate::CPU_HZ);
+        let f = pitch(&s[4800..]);
+        assert!((f - 437.8).abs() < 1.0, "measured {f:.2} Hz");
+    }
+
+    #[test]
+    fn silence_is_zero_even_with_a_constant_channel() {
+        // Volume-only at a fixed level is a DC step; the AC coupling must
+        // bring it back to zero, or the stream ends on a click.
+        let mut p = Pokey::new();
+        p.skctl = 3;
+        p.write(0x07, 0x1f);
+        let s = run(&mut p, crate::CPU_HZ * 2);
+        let tail = &s[s.len() - 480..];
+        assert!(tail.iter().all(|&v| v.abs() < 64), "tail {:?}", &tail[..8]);
+        assert!(s[..480].iter().any(|&v| v.abs() > 10_000), "the step itself was audible");
+    }
+
+    /// The output flip-flop of channel `ch` sampled after each of its timer
+    /// pulses, for `n` pulses.
+    fn ff_per_pulse(p: &mut Pokey, ch: usize, n: usize) -> Vec<bool> {
+        let mut seen = Vec::new();
+        while seen.len() < n {
+            let before = p.counter[ch];
+            p.tick(false, true, 0);
+            if p.counter[ch] > before {
+                seen.push(p.ff[ch]);
+            }
+        }
+        seen
+    }
+
+    #[test]
+    fn pure_tone_alternates_on_every_pulse_and_noise_does_not() {
+        let mut p = Pokey::new();
+        p.skctl = 3;
+        p.write(0x04, 0x05); // AUDF3
+        p.write(0x05, 0xa8); // AUDC3: pure tone
+        let tone = ff_per_pulse(&mut p, 2, 64);
+        assert!(tone.windows(2).all(|w| w[0] != w[1]), "pure tone must toggle every pulse");
+
+        p.write(0x05, 0x88); // AUDC3: poly-17 noise, no poly-5 mask
+        let noise = ff_per_pulse(&mut p, 2, 256);
+        let repeats = noise.windows(2).filter(|w| w[0] == w[1]).count();
+        assert!(repeats > 64, "noise repeated a level only {repeats} times in 255");
+        assert!(noise.iter().any(|&b| b) && noise.iter().any(|&b| !b));
     }
 
     #[test]
