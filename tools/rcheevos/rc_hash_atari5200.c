@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  * Copyright (C) 2026 Prodigy75000
  *
- * rcheevos is MIT. Offering this upstream would need it relicensed to MIT,
- * which is the owner's decision, not made here.
+ * Written as rcheevos would carry it, to check the rule inside rcheevos.
+ * Not submitted upstream (owner, 2026-10-11).
  *
  * The same cartridge circulates at several sizes: an image repeated to fill
  * 16K or 32K, and a two-chip 16K cartridge written out as 32K in the order
