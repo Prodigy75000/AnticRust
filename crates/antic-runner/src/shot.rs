@@ -100,7 +100,7 @@ fn main() {
     let bios = std::fs::read(root.join("bios/[BIOS] Atari 5200 (USA).a52")).expect("read bios");
     let cart = match map {
         Some(m) => Cart::new(rom, m).expect("mapping"),
-        None => Cart::with_default_mapping(rom).expect("mapping"),
+        None => Cart::identified(rom).expect("mapping"),
     };
     let mut m = Machine::new(cart, Some(&bios));
     // Sticks powered and centred is what a controller at rest reports.

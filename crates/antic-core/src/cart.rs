@@ -42,6 +42,57 @@ impl Mapping {
     }
 }
 
+/// 16K commercial images that need [`Mapping::OneChip16`], by CRC-32 of the
+/// whole file. Measured, not asserted: under two-chip each of these jams the
+/// CPU or runs into a BRK storm on the real BIOS, or executes an order of
+/// magnitude less code (Wizard of Wor, Zone Ranger); see
+/// docs/notes/BIOS-CENSUS.md. Every other 16K image runs as two-chip.
+///
+/// This is the core's own lookup for which mapping to apply. It is not the
+/// RetroAchievements hash, which is a separate decision.
+pub const ONE_CHIP_16K: [(u32, &str); 15] = [
+    (0xf43e7cd0, "Activision Decathlon, The (1984) (Activision)"),
+    (0x9bae58dc, "Beamrider (1984) (Activision)"),
+    (0xbe3cd348, "Berzerk (1983) (Atari)"),
+    (0x0624e6e7, "Blueprint (1982) (CBS)"),
+    (0x9ad53bbc, "Choplifter (1984) (Atari)"),
+    (0x18a73af3, "H.E.R.O. (1984) (Activision)"),
+    (0xab8e035b, "Meteorites (1983) (Electra Concepts)"),
+    (0x7df1adfb, "Miner 2049er (1983) (Big Five Software)"),
+    (0xd0b2f285, "Moon Patrol (1983) (Atari)"),
+    (0x4b910461, "Pitfall II - The Lost Caverns (1984) (Activision)"),
+    (0xb5f3402b, "Quest for Quintana Roo (1984) (Sunrise Software)"),
+    (0x4252abd9, "Robotron 2084 (1983) (Atari)"),
+    (0x387365dc, "Space Shuttle - A Journey Into Space (1983) (Activision)"),
+    (0xd6f7ddfd, "Wizard of Wor (1982) (CBS)"),
+    (0x2959d827, "Zone Ranger (1984) (Activision)"),
+];
+
+/// CRC-32 (IEEE, the zlib one), for [`ONE_CHIP_16K`].
+pub fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
+    for &b in data {
+        crc ^= b as u32;
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb8_8320 } else { crc >> 1 };
+        }
+    }
+    !crc
+}
+
+impl Mapping {
+    /// The mapping for this image, or None for a size no mapping handles.
+    pub fn identify(rom: &[u8]) -> Option<Mapping> {
+        if rom.len() == 16384 {
+            let crc = crc32(rom);
+            if ONE_CHIP_16K.iter().any(|&(c, _)| c == crc) {
+                return Some(Mapping::OneChip16);
+            }
+        }
+        Mapping::candidates(rom.len()).first().copied()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CartError {
     /// No mapping handles an image of this size.
@@ -76,6 +127,13 @@ impl Cart {
         let m = *Mapping::candidates(rom.len())
             .first()
             .ok_or(CartError::UnsupportedSize(rom.len()))?;
+        Cart::new(rom, m)
+    }
+
+    /// The mapping this image needs: [`ONE_CHIP_16K`] decides 16K images,
+    /// the size decides the rest. What the libretro core uses.
+    pub fn identified(rom: Vec<u8>) -> Result<Self, CartError> {
+        let m = Mapping::identify(&rom).ok_or(CartError::UnsupportedSize(rom.len()))?;
         Cart::new(rom, m)
     }
 
@@ -163,6 +221,20 @@ mod tests {
         let c = Cart::new(image(16384), Mapping::OneChip16).unwrap();
         let blocks: Vec<u8> = (0..8).map(|k| c.peek(0x4000 + k * 0x1000).unwrap()).collect();
         assert_eq!(blocks, vec![0, 1, 2, 3, 0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn crc32_matches_the_published_check_value() {
+        // The standard check value for CRC-32/ISO-HDLC over "123456789".
+        assert_eq!(crc32(b"123456789"), 0xcbf4_3926);
+    }
+
+    #[test]
+    fn a_listed_16k_image_is_one_chip_and_others_two_chip() {
+        // A 16K image whose CRC is not in the table defaults to two-chip.
+        assert_eq!(Mapping::identify(&image(16384)), Some(Mapping::TwoChip16));
+        assert_eq!(Mapping::identify(&image(8192)), Some(Mapping::Mirror));
+        assert_eq!(Mapping::identify(&image(12345)), None);
     }
 
     #[test]

@@ -93,7 +93,7 @@ fn main() {
     let bios = std::fs::read(&bios_path).expect("read bios");
     let cart = match map {
         Some(m) => Cart::new(rom, m).expect("mapping"),
-        None => Cart::with_default_mapping(rom).expect("mapping"),
+        None => Cart::identified(rom).expect("mapping"),
     };
     println!("cart    : {cart_path} ({:?})", cart.mapping);
     let mut m = Machine::new(cart, if hle { None } else { Some(&bios) });
