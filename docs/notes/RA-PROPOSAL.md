@@ -191,7 +191,7 @@ Breaking the C version's rule 3 drops this to 206 of 215.
 
 ### Not submitted
 
-The owner does not plan to submit this upstream (2026-10-11). RA has no 5200
+There is no plan to submit this upstream (2026-10-11). RA has no 5200
 sets, and when they take the console on they will choose their own method.
 This document records what the core does and why, so it is there if they
 come looking.

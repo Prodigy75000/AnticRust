@@ -82,7 +82,11 @@ fn ranges(s: &BTreeSet<u16>) -> String {
         while it.peek() == Some(&(hi.wrapping_add(1))) {
             hi = it.next().unwrap();
         }
-        out.push(if lo == hi { format!("{lo:04X}") } else { format!("{lo:04X}-{hi:04X}") });
+        out.push(if lo == hi {
+            format!("{lo:04X}")
+        } else {
+            format!("{lo:04X}-{hi:04X}")
+        });
     }
     out.join(" ")
 }
@@ -360,7 +364,10 @@ fn main() {
 
     let mut jobs: Vec<(PathBuf, Mapping)> = Vec::new();
     let mut unsupported = Vec::new();
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).expect("read dir").map(|e| e.unwrap().path()).collect();
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .expect("read dir")
+        .map(|e| e.unwrap().path())
+        .collect();
     files.sort();
     for p in &files {
         let len = std::fs::metadata(p).unwrap().len() as usize;
@@ -375,7 +382,9 @@ fn main() {
 
     let jobs = Arc::new(Mutex::new(jobs.into_iter().enumerate().collect::<Vec<_>>()));
     let results = Arc::new(Mutex::new(Vec::new()));
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     let mut hs = Vec::new();
     for _ in 0..threads {
         let (jobs, results, bios) = (jobs.clone(), results.clone(), bios.clone());
@@ -394,7 +403,19 @@ fn main() {
 
     let mut r = String::new();
     let fr = |cyc: u64| cyc as f64 / CYCLES_PER_FRAME;
-    writeln!(r, "BIOS census: {} runs over {} files in {}, {frames} frames each, {}", results.len(), files.len(), dir.display(), if input { "scripted input (start, fire, top, keypad 1, stick sweep)" } else { "no input" }).unwrap();
+    writeln!(
+        r,
+        "BIOS census: {} runs over {} files in {}, {frames} frames each, {}",
+        results.len(),
+        files.len(),
+        dir.display(),
+        if input {
+            "scripted input (start, fire, top, keypad 1, stick sweep)"
+        } else {
+            "no input"
+        }
+    )
+    .unwrap();
     for (name, len) in &unsupported {
         writeln!(r, "UNSUPPORTED SIZE: {name} ({len} bytes)").unwrap();
     }
@@ -402,7 +423,10 @@ fn main() {
         let c = &o.c;
         writeln!(r).unwrap();
         writeln!(r, "== {} [{:?}]", o.title, o.mapping).unwrap();
-        let entry = c.entered.map(|e| format!("cycle {e} (frame {:.1})", fr(e))).unwrap_or_else(|| "NEVER".into());
+        let entry = c
+            .entered
+            .map(|e| format!("cycle {e} (frame {:.1})", fr(e)))
+            .unwrap_or_else(|| "NEVER".into());
         let setup = match (c.wait_start, c.entered) {
             (Some(w), Some(e)) => format!("setup {w} cycles, wait {} cycles", e - w),
             _ => String::from("no logo wait"),
@@ -414,8 +438,23 @@ fn main() {
             if o.halted { " ; CPU JAMMED" } else { "" }
         )
         .unwrap();
-        writeln!(r, "  cart pcs : {} distinct ; {} BRKs executed outside the BIOS", c.cart_pcs.len(), c.brks).unwrap();
-        writeln!(r, "  calls    : {}", c.calls.iter().map(|(a, n)| format!("{a:04X}x{n}")).collect::<Vec<_>>().join(" ")).unwrap();
+        writeln!(
+            r,
+            "  cart pcs : {} distinct ; {} BRKs executed outside the BIOS",
+            c.cart_pcs.len(),
+            c.brks
+        )
+        .unwrap();
+        writeln!(
+            r,
+            "  calls    : {}",
+            c.calls
+                .iter()
+                .map(|(a, n)| format!("{a:04X}x{n}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+        .unwrap();
         writeln!(
             r,
             "  vectors  : {}",
@@ -433,30 +472,82 @@ fn main() {
         writeln!(
             r,
             "  exits    : {}",
-            exits.iter().map(|(f, ts)| format!("{f:04X}->[{}]", ranges(ts))).collect::<Vec<_>>().join(" ")
+            exits
+                .iter()
+                .map(|(f, ts)| format!("{f:04X}->[{}]", ranges(ts)))
+                .collect::<Vec<_>>()
+                .join(" ")
         )
         .unwrap();
-        writeln!(r, "  bios pcs : {} distinct after entry", c.bios_pcs_after_entry.len()).unwrap();
-        writeln!(r, "  data     : {} reads of [{}]", c.data_reads.values().sum::<u64>(), ranges(&c.data_reads.keys().copied().collect())).unwrap();
+        writeln!(
+            r,
+            "  bios pcs : {} distinct after entry",
+            c.bios_pcs_after_entry.len()
+        )
+        .unwrap();
+        writeln!(
+            r,
+            "  data     : {} reads of [{}]",
+            c.data_reads.values().sum::<u64>(),
+            ranges(&c.data_reads.keys().copied().collect())
+        )
+        .unwrap();
         writeln!(
             r,
             "  dma      : {} ANTIC fetches of the BIOS region{}",
             c.dma_bios,
-            if c.dma_bios > 0 { format!(" ({:04X}-{:04X})", c.dma_bios_lo, c.dma_bios_hi) } else { String::new() }
+            if c.dma_bios > 0 {
+                format!(" ({:04X}-{:04X})", c.dma_bios_lo, c.dma_bios_hi)
+            } else {
+                String::new()
+            }
         )
         .unwrap();
-        writeln!(r, "  ram boot : {} [{}]", c.ram_dep_boot.len(), ranges(&c.ram_dep_boot)).unwrap();
-        writeln!(r, "  ram run  : {} [{}]", c.ram_dep_run.len(), ranges(&c.ram_dep_run)).unwrap();
-        writeln!(r, "  ram never: {} bytes read before anyone wrote them", c.ram_dep_never.len()).unwrap();
-        writeln!(r, "  stack    : {} cart reads of stack bytes a BIOS handler pushed", c.stack_dep).unwrap();
+        writeln!(
+            r,
+            "  ram boot : {} [{}]",
+            c.ram_dep_boot.len(),
+            ranges(&c.ram_dep_boot)
+        )
+        .unwrap();
+        writeln!(
+            r,
+            "  ram run  : {} [{}]",
+            c.ram_dep_run.len(),
+            ranges(&c.ram_dep_run)
+        )
+        .unwrap();
+        writeln!(
+            r,
+            "  ram never: {} bytes read before anyone wrote them",
+            c.ram_dep_never.len()
+        )
+        .unwrap();
+        writeln!(
+            r,
+            "  stack    : {} cart reads of stack bytes a BIOS handler pushed",
+            c.stack_dep
+        )
+        .unwrap();
         let inherited: Vec<String> = c
             .regs_boot
             .iter()
             .filter(|(a, _)| !c.regs_cart.contains(a))
             .map(|(a, (chip, v))| format!("{chip}:{a:04X}={v:02X}"))
             .collect();
-        writeln!(r, "  regs     : {} stateful registers the BIOS set at boot and the cart never wrote [{}]", inherited.len(), inherited.join(" ")).unwrap();
-        writeln!(r, "  bios regs: BIOS code wrote [{}] after entry", ranges(&c.regs_bios_run)).unwrap();
+        writeln!(
+            r,
+            "  regs     : {} stateful registers the BIOS set at boot and the cart never wrote [{}]",
+            inherited.len(),
+            inherited.join(" ")
+        )
+        .unwrap();
+        writeln!(
+            r,
+            "  bios regs: BIOS code wrote [{}] after entry",
+            ranges(&c.regs_bios_run)
+        )
+        .unwrap();
     }
 
     // Aggregate, one row per FILE. For 16K the mapping that kept running and
@@ -464,7 +555,9 @@ fn main() {
     let mut best: BTreeMap<String, &Outcome> = BTreeMap::new();
     for (_, o) in &results {
         let e = best.entry(o.title.clone()).or_insert(o);
-        if (!o.halted, o.c.brks == 0, o.c.cart_pcs.len()) > (!e.halted, e.c.brks == 0, e.c.cart_pcs.len()) {
+        if (!o.halted, o.c.brks == 0, o.c.cart_pcs.len())
+            > (!e.halted, e.c.brks == 0, e.c.cart_pcs.len())
+        {
             *e = o;
         }
     }
@@ -472,11 +565,26 @@ fn main() {
     let count = |f: &dyn Fn(&Outcome) -> bool| best.values().filter(|o| f(o)).count();
     writeln!(r).unwrap();
     writeln!(r, "== AGGREGATE over {n} files").unwrap();
-    writeln!(r, "  entered the cart          : {}", count(&|o| o.c.entered.is_some())).unwrap();
+    writeln!(
+        r,
+        "  entered the cart          : {}",
+        count(&|o| o.c.entered.is_some())
+    )
+    .unwrap();
     writeln!(r, "  still running at the end  : {}", count(&|o| !o.halted)).unwrap();
-    writeln!(r, "  running with no BRK storm : {}", count(&|o| !o.halted && o.c.brks == 0)).unwrap();
+    writeln!(
+        r,
+        "  running with no BRK storm : {}",
+        count(&|o| !o.halted && o.c.brks == 0)
+    )
+    .unwrap();
     for o in best.values().filter(|o| o.c.brks > 0) {
-        writeln!(r, "    BRKs under its best mapping ({}): {}", o.c.brks, o.title).unwrap();
+        writeln!(
+            r,
+            "    BRKs under its best mapping ({}): {}",
+            o.c.brks, o.title
+        )
+        .unwrap();
     }
     for o in best.values().filter(|o| o.halted) {
         writeln!(r, "    JAMMED under every mapping tried: {}", o.title).unwrap();
@@ -485,33 +593,107 @@ fn main() {
     for o in best.values() {
         *maps.entry(format!("{:?}", o.mapping)).or_default() += 1;
     }
-    writeln!(r, "  mapping that ran          : {}", maps.iter().map(|(m, n)| format!("{m}:{n}")).collect::<Vec<_>>().join(" ")).unwrap();
+    writeln!(
+        r,
+        "  mapping that ran          : {}",
+        maps.iter()
+            .map(|(m, n)| format!("{m}:{n}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
+    .unwrap();
     for o in best.values().filter(|o| o.mapping == Mapping::OneChip16) {
         writeln!(r, "    one-chip 16K: {}", o.title).unwrap();
     }
     let both_ran = best
         .values()
+        .filter(|o| o.mapping == Mapping::TwoChip16 || o.mapping == Mapping::OneChip16)
         .filter(|o| {
-            o.mapping == Mapping::TwoChip16 || o.mapping == Mapping::OneChip16
+            results
+                .iter()
+                .filter(|(_, x)| x.title == o.title && !x.halted && x.c.brks == 0)
+                .count()
+                > 1
         })
-        .filter(|o| results.iter().filter(|(_, x)| x.title == o.title && !x.halted && x.c.brks == 0).count() > 1)
         .count();
-    writeln!(r, "  16K titles that ran under BOTH mappings (undecided) : {both_ran}").unwrap();
+    writeln!(
+        r,
+        "  16K titles that ran under BOTH mappings (undecided) : {both_ran}"
+    )
+    .unwrap();
     writeln!(r, "  skip boot ($BFFD=FF)      : {}", count(&|o| o.skip)).unwrap();
-    writeln!(r, "  call into the BIOS        : {}", count(&|o| !o.c.calls.is_empty())).unwrap();
-    writeln!(r, "  read the BIOS as data     : {}", count(&|o| !o.c.data_reads.is_empty())).unwrap();
+    writeln!(
+        r,
+        "  call into the BIOS        : {}",
+        count(&|o| !o.c.calls.is_empty())
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  read the BIOS as data     : {}",
+        count(&|o| !o.c.data_reads.is_empty())
+    )
+    .unwrap();
     let font = count(&|o| o.c.data_reads.keys().any(|a| *a < 0xfc00));
     let code = count(&|o| o.c.data_reads.keys().any(|a| *a >= 0xfc00));
-    writeln!(r, "    of the font $F800-$FBFF : {font} ; of code/vectors $FC00-$FFFF : {code}").unwrap();
-    writeln!(r, "  ANTIC fetches BIOS (font) : {}", count(&|o| o.c.dma_bios > 0)).unwrap();
-    writeln!(r, "  take the NMI vector       : {}", count(&|o| o.c.vectors.contains_key(&0xfffa))).unwrap();
-    writeln!(r, "  take the IRQ/BRK vector   : {}", count(&|o| o.c.vectors.contains_key(&0xfffe))).unwrap();
-    writeln!(r, "  read BIOS-boot RAM        : {}", count(&|o| !o.c.ram_dep_boot.is_empty())).unwrap();
-    writeln!(r, "  read BIOS-runtime RAM     : {}", count(&|o| !o.c.ram_dep_run.is_empty())).unwrap();
-    writeln!(r, "  pull what a BIOS handler pushed : {}", count(&|o| o.c.stack_dep > 0)).unwrap();
-    writeln!(r, "  BIOS writes hw regs after entry : {}", count(&|o| !o.c.regs_bios_run.is_empty())).unwrap();
-    let union: BTreeSet<u16> = best.values().flat_map(|o| o.c.bios_pcs_after_entry.iter().copied()).collect();
-    writeln!(r, "  BIOS instructions executed after entry, union : {} [{}]", union.len(), ranges(&union)).unwrap();
+    writeln!(
+        r,
+        "    of the font $F800-$FBFF : {font} ; of code/vectors $FC00-$FFFF : {code}"
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  ANTIC fetches BIOS (font) : {}",
+        count(&|o| o.c.dma_bios > 0)
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  take the NMI vector       : {}",
+        count(&|o| o.c.vectors.contains_key(&0xfffa))
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  take the IRQ/BRK vector   : {}",
+        count(&|o| o.c.vectors.contains_key(&0xfffe))
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  read BIOS-boot RAM        : {}",
+        count(&|o| !o.c.ram_dep_boot.is_empty())
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  read BIOS-runtime RAM     : {}",
+        count(&|o| !o.c.ram_dep_run.is_empty())
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  pull what a BIOS handler pushed : {}",
+        count(&|o| o.c.stack_dep > 0)
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  BIOS writes hw regs after entry : {}",
+        count(&|o| !o.c.regs_bios_run.is_empty())
+    )
+    .unwrap();
+    let union: BTreeSet<u16> = best
+        .values()
+        .flat_map(|o| o.c.bios_pcs_after_entry.iter().copied())
+        .collect();
+    writeln!(
+        r,
+        "  BIOS instructions executed after entry, union : {} [{}]",
+        union.len(),
+        ranges(&union)
+    )
+    .unwrap();
 
     let mut call_targets: BTreeMap<u16, usize> = BTreeMap::new();
     let mut exit_points: BTreeMap<u16, usize> = BTreeMap::new();
@@ -533,7 +715,11 @@ fn main() {
         for a in &o.c.ram_dep_run {
             *run_ram.entry(*a).or_default() += 1;
         }
-        for (a, (_, v)) in o.c.regs_boot.iter().filter(|(a, _)| !o.c.regs_cart.contains(a)) {
+        for (a, (_, v)) in
+            o.c.regs_boot
+                .iter()
+                .filter(|(a, _)| !o.c.regs_cart.contains(a))
+        {
             *regvals.entry((*a, *v)).or_default() += 1;
         }
         for a in o.c.data_reads.keys() {
@@ -546,23 +732,68 @@ fn main() {
     let top = |m: &BTreeMap<u16, usize>| {
         let mut v: Vec<_> = m.iter().collect();
         v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
-        v.iter().take(40).map(|(a, n)| format!("{a:04X}:{n}")).collect::<Vec<_>>().join(" ")
+        v.iter()
+            .take(40)
+            .map(|(a, n)| format!("{a:04X}:{n}"))
+            .collect::<Vec<_>>()
+            .join(" ")
     };
-    let common = |m: &BTreeMap<u16, usize>, k: usize| ranges(&m.iter().filter(|(_, n)| **n >= k).map(|(a, _)| *a).collect());
+    let common = |m: &BTreeMap<u16, usize>, k: usize| {
+        ranges(
+            &m.iter()
+                .filter(|(_, n)| **n >= k)
+                .map(|(a, _)| *a)
+                .collect(),
+        )
+    };
     writeln!(r, "  call targets (titles)     : {}", top(&call_targets)).unwrap();
     writeln!(r, "  BIOS exit points (titles) : {}", top(&exit_points)).unwrap();
-    writeln!(r, "  BIOS data read by >=2 titles : {}", common(&data_addrs, 2)).unwrap();
-    writeln!(r, "  BIOS data read by 1 title    : {}", ranges(&data_addrs.iter().filter(|(_, n)| **n == 1).map(|(a, _)| *a).collect())).unwrap();
-    writeln!(r, "  boot RAM read by >=5 titles  : {}", common(&boot_ram, 5)).unwrap();
-    writeln!(r, "  boot RAM read by >=2 titles  : {}", common(&boot_ram, 2)).unwrap();
+    writeln!(
+        r,
+        "  BIOS data read by >=2 titles : {}",
+        common(&data_addrs, 2)
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  BIOS data read by 1 title    : {}",
+        ranges(
+            &data_addrs
+                .iter()
+                .filter(|(_, n)| **n == 1)
+                .map(|(a, _)| *a)
+                .collect()
+        )
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  boot RAM read by >=5 titles  : {}",
+        common(&boot_ram, 5)
+    )
+    .unwrap();
+    writeln!(
+        r,
+        "  boot RAM read by >=2 titles  : {}",
+        common(&boot_ram, 2)
+    )
+    .unwrap();
     writeln!(r, "  runtime RAM read (titles) : {}", top(&run_ram)).unwrap();
-    writeln!(r, "  BIOS-written hw regs after entry (titles) : {}", top(&bios_run_regs)).unwrap();
+    writeln!(
+        r,
+        "  BIOS-written hw regs after entry (titles) : {}",
+        top(&bios_run_regs)
+    )
+    .unwrap();
     let mut rv: Vec<_> = regvals.iter().filter(|((_, v), _)| *v != 0).collect();
     rv.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
     writeln!(
         r,
         "  inherited NONZERO regs (value:titles) : {}",
-        rv.iter().map(|((a, v), n)| format!("{a:04X}={v:02X}:{n}")).collect::<Vec<_>>().join(" ")
+        rv.iter()
+            .map(|((a, v), n)| format!("{a:04X}={v:02X}:{n}"))
+            .collect::<Vec<_>>()
+            .join(" ")
     )
     .unwrap();
     let mut setups: BTreeSet<(u64, u64)> = BTreeSet::new();

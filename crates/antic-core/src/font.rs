@@ -5,8 +5,7 @@
 //! ANTIC indexes them (character name bits 0-6).
 //!
 //! The census found 45 titles display this font through ANTIC and 24 copy
-//! glyphs out of it, so the owner decided (2026-10-11) it should look like
-//! the original. At 8x8 that means the same pixels, so the glyphs below were
+//! glyphs out of it, so it looks like the original. At 8x8 that means the same pixels, so the glyphs below were
 //! drawn from the original by a one-off script and are kept here as text art,
 //! one row per line, `#` lit and `.` dark. Nothing reads a BIOS file to build
 //! it; this source is the font.
@@ -1200,7 +1199,10 @@ mod tests {
         assert!(FONT[0..8].iter().all(|&b| b == 0), "glyph 0 is the space");
         // Internal codes $01-$3F are punctuation, digits and capitals.
         for g in 1..0x40 {
-            assert!(FONT[g * 8..g * 8 + 8].iter().any(|&b| b != 0), "glyph {g:02X} is empty");
+            assert!(
+                FONT[g * 8..g * 8 + 8].iter().any(|&b| b != 0),
+                "glyph {g:02X} is empty"
+            );
         }
     }
 }

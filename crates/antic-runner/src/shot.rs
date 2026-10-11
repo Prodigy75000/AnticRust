@@ -34,7 +34,9 @@ fn apply(m: &mut Machine, key: &str, down: bool) {
         "reset" => Some(Key::Reset),
         "star" => Some(Key::Star),
         "hash" => Some(Key::Hash),
-        d if d.len() == 1 && d.as_bytes()[0].is_ascii_digit() => Some(Key::Digit(d.as_bytes()[0] - b'0')),
+        d if d.len() == 1 && d.as_bytes()[0].is_ascii_digit() => {
+            Some(Key::Digit(d.as_bytes()[0] - b'0'))
+        }
         "fire" => {
             m.bus.gtia.trigger[0] = down;
             return;
@@ -74,13 +76,29 @@ fn main() {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--frames" => { i += 1; frames = args[i].parse().expect("frames"); }
-            "--out" => { i += 1; out = PathBuf::from(&args[i]); }
-            "--every" => { i += 1; every = args[i].parse().expect("every"); }
-            "--wav" => { i += 1; wav = Some(PathBuf::from(&args[i])); }
+            "--frames" => {
+                i += 1;
+                frames = args[i].parse().expect("frames");
+            }
+            "--out" => {
+                i += 1;
+                out = PathBuf::from(&args[i]);
+            }
+            "--every" => {
+                i += 1;
+                every = args[i].parse().expect("every");
+            }
+            "--wav" => {
+                i += 1;
+                wav = Some(PathBuf::from(&args[i]));
+            }
             "--hle" => hle = true,
             "--colors" => colors = true,
-            "--state" => { i += 1; state = Some(PathBuf::from(&args[i])); hle = true; }
+            "--state" => {
+                i += 1;
+                state = Some(PathBuf::from(&args[i]));
+                hle = true;
+            }
             "--map" => {
                 i += 1;
                 map = Some(match args[i].as_str() {
@@ -99,7 +117,11 @@ fn main() {
                     Some((a, l)) => (a.parse().unwrap(), l.parse().unwrap()),
                     None => (rest.parse().unwrap(), 10),
                 };
-                presses.push(Press { key: key.to_string(), at, len });
+                presses.push(Press {
+                    key: key.to_string(),
+                    at,
+                    len,
+                });
             }
             a => cart_path = Some(a.to_string()),
         }
@@ -107,14 +129,19 @@ fn main() {
     }
     let cart_path = cart_path.expect("usage: shot <cart> [options]");
     let rom = std::fs::read(&cart_path).expect("read cart");
-    let bios = if hle { None } else { Some(std::fs::read(root.join("bios/[BIOS] Atari 5200 (USA).a52")).expect("read bios")) };
+    let bios = if hle {
+        None
+    } else {
+        Some(std::fs::read(root.join("bios/[BIOS] Atari 5200 (USA).a52")).expect("read bios"))
+    };
     let cart = match map {
         Some(m) => Cart::new(rom, m).expect("mapping"),
         None => Cart::identified(rom).expect("mapping"),
     };
     let mut m = Machine::new(cart, bios.as_deref());
     if let Some(p) = &state {
-        m.load_state(&std::fs::read(p).expect("read state")).expect("load state");
+        m.load_state(&std::fs::read(p).expect("read state"))
+            .expect("load state");
     }
     // Sticks powered and centred is what a controller at rest reports.
     std::fs::create_dir_all(out.parent().unwrap()).ok();
@@ -134,7 +161,10 @@ fn main() {
             let path = if last && every == 0 {
                 out.clone()
             } else {
-                out.with_file_name(format!("{}-{f:05}.png", out.file_stem().unwrap().to_string_lossy()))
+                out.with_file_name(format!(
+                    "{}-{f:05}.png",
+                    out.file_stem().unwrap().to_string_lossy()
+                ))
             };
             save(&m, &path);
         }
@@ -142,8 +172,14 @@ fn main() {
     if let Some(w) = &wav {
         write_wav(w, &audio);
         let peak = audio.iter().map(|v| v.unsigned_abs()).max().unwrap_or(0);
-        let rms = (audio.iter().map(|&v| (v as f64).powi(2)).sum::<f64>() / audio.len().max(1) as f64).sqrt();
-        println!("wrote {} ({} samples, peak {peak}, rms {rms:.0})", w.display(), audio.len());
+        let rms = (audio.iter().map(|&v| (v as f64).powi(2)).sum::<f64>()
+            / audio.len().max(1) as f64)
+            .sqrt();
+        println!(
+            "wrote {} ({} samples, peak {peak}, rms {rms:.0})",
+            w.display(),
+            audio.len()
+        );
     }
     if colors {
         let mut n = [0usize; 256];

@@ -72,7 +72,9 @@ fn boot(rom: &[u8], mapping: Mapping, bios: Option<&[u8]>, swap: bool) -> Option
 /// Distinct cartridge addresses executed in 600 frames on the real BIOS
 /// with the scripted input: the census's tie-break between mappings.
 fn coverage(rom: &[u8], mapping: Mapping, bios: &[u8]) -> usize {
-    let Some(mut m) = boot(rom, mapping, Some(bios), false) else { return 0 };
+    let Some(mut m) = boot(rom, mapping, Some(bios), false) else {
+        return 0;
+    };
     let mut seen = std::collections::HashSet::new();
     let mut brk = false;
     for f in 0..600 {
@@ -92,7 +94,11 @@ fn coverage(rom: &[u8], mapping: Mapping, bios: &[u8]) -> usize {
             break;
         }
     }
-    if brk { 0 } else { seen.len() }
+    if brk {
+        0
+    } else {
+        seen.len()
+    }
 }
 
 struct Snap {
@@ -100,14 +106,23 @@ struct Snap {
     ram: Vec<u8>,
 }
 
-fn run(rom: &[u8], mapping: Mapping, bios: Option<&[u8]>, frames: u64, swap: bool) -> Option<(Vec<Snap>, bool)> {
+fn run(
+    rom: &[u8],
+    mapping: Mapping,
+    bios: Option<&[u8]>,
+    frames: u64,
+    swap: bool,
+) -> Option<(Vec<Snap>, bool)> {
     let mut m = boot(rom, mapping, bios, swap)?;
     let mut snaps = Vec::new();
     for f in 0..frames {
         script(&mut m, f);
         m.run_frame();
         if CHECKPOINTS.contains(&(f + 1)) {
-            snaps.push(Snap { frame: m.bus.gtia.frame.clone(), ram: m.bus.ram.to_vec() });
+            snaps.push(Snap {
+                frame: m.bus.gtia.frame.clone(),
+                ram: m.bus.ram.to_vec(),
+            });
         }
         if m.cpu.halted {
             return Some((snaps, true));
@@ -145,9 +160,18 @@ fn main() {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--dir" => { i += 1; dir = PathBuf::from(&args[i]); }
-            "--frames" => { i += 1; frames = args[i].parse().unwrap(); }
-            "--only" => { i += 1; only = args[i].clone(); }
+            "--dir" => {
+                i += 1;
+                dir = PathBuf::from(&args[i]);
+            }
+            "--frames" => {
+                i += 1;
+                frames = args[i].parse().unwrap();
+            }
+            "--only" => {
+                i += 1;
+                only = args[i].clone();
+            }
             "--swap" => swap = true,
             a => panic!("unknown argument {a}"),
         }
@@ -157,13 +181,18 @@ fn main() {
     let outdir = root.join("out/hlediff");
     std::fs::create_dir_all(&outdir).ok();
 
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).collect();
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
     files.sort();
     files.retain(|p| p.to_string_lossy().contains(&only));
 
     let results = std::sync::Mutex::new(Vec::new());
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| loop {
@@ -185,26 +214,53 @@ fn main() {
                 let chosen = chosen.map(|(m, s, _)| (m, s));
                 let line = match chosen {
                     None => format!("SKIP  {title}: no mapping runs on the real BIOS"),
-                    Some((mp, real)) => match if swap { run(&rom, mp, Some(&bios), frames, true) } else { run(&rom, mp, None, frames, false) } {
+                    Some((mp, real)) => match if swap {
+                        run(&rom, mp, Some(&bios), frames, true)
+                    } else {
+                        run(&rom, mp, None, frames, false)
+                    } {
                         None => format!("FAIL  {title} [{mp:?}]: HLE never entered the cart"),
                         Some((hle, jam)) => {
-                            let same_frames: Vec<bool> = real.iter().zip(&hle).map(|(a, b)| a.frame == b.frame).collect();
+                            let same_frames: Vec<bool> = real
+                                .iter()
+                                .zip(&hle)
+                                .map(|(a, b)| a.frame == b.frame)
+                                .collect();
                             let ram_diff: Vec<usize> = real
                                 .iter()
                                 .zip(&hle)
-                                .map(|(a, b)| a.ram.iter().zip(&b.ram).filter(|(x, y)| x != y).count())
+                                .map(|(a, b)| {
+                                    a.ram.iter().zip(&b.ram).filter(|(x, y)| x != y).count()
+                                })
                                 .collect();
-                            let marks: String = same_frames.iter().map(|&s| if s { '=' } else { 'x' }).collect();
+                            let marks: String = same_frames
+                                .iter()
+                                .map(|&s| if s { '=' } else { 'x' })
+                                .collect();
                             let all = same_frames.iter().all(|&s| s) && hle.len() == real.len();
                             if !all {
                                 if let (Some(a), Some(b)) = (real.last(), hle.last()) {
-                                    let name: String = title.chars().filter(|c| c.is_ascii_alphanumeric()).take(28).collect();
-                                    save_pair(&outdir.join(format!("{name}.png")), &a.frame, &b.frame);
+                                    let name: String = title
+                                        .chars()
+                                        .filter(|c| c.is_ascii_alphanumeric())
+                                        .take(28)
+                                        .collect();
+                                    save_pair(
+                                        &outdir.join(format!("{name}.png")),
+                                        &a.frame,
+                                        &b.frame,
+                                    );
                                 }
                             }
                             format!(
                                 "{} {title} [{mp:?}] frames {marks} ram-diff {:?}{}",
-                                if all { "SAME " } else if jam { "JAM  " } else { "DIFF " },
+                                if all {
+                                    "SAME "
+                                } else if jam {
+                                    "JAM  "
+                                } else {
+                                    "DIFF "
+                                },
                                 ram_diff,
                                 if jam { " (HLE run jammed)" } else { "" }
                             )
@@ -225,5 +281,13 @@ fn main() {
         }
     }
     println!("checkpoints at frames {CHECKPOINTS:?} after alignment; = identical frame, x differs");
-    println!("{same} of {} titles identical at every checkpoint ({})", results.len(), if swap { "run time only: both booted on the real BIOS, HLE swapped in at entry" } else { "HLE boot and run time" });
+    println!(
+        "{same} of {} titles identical at every checkpoint ({})",
+        results.len(),
+        if swap {
+            "run time only: both booted on the real BIOS, HLE swapped in at entry"
+        } else {
+            "HLE boot and run time"
+        }
+    );
 }

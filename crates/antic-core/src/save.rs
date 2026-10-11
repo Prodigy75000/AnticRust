@@ -77,7 +77,7 @@ impl WriteCursor {
         self.buf.push(v as u8);
     }
 
-    /// Raw byte block (RAM, register files). Length is *not* prefixed: 
+    /// Raw byte block (RAM, register files). Length is *not* prefixed:
     /// both sides agree on the fixed size, which keeps states compact and makes
     /// a size mismatch a load-time error rather than silent misalignment.
     pub fn bytes(&mut self, v: &[u8]) {

@@ -49,7 +49,10 @@ pub enum Slot {
 impl Slot {
     /// Whether this slot occupies the bus, halting the CPU.
     pub fn uses_bus(self) -> bool {
-        !matches!(self, Slot::Free | Slot::PfLoadVirtual(_) | Slot::PfCharVirtual(_))
+        !matches!(
+            self,
+            Slot::Free | Slot::PfLoadVirtual(_) | Slot::PfCharVirtual(_)
+        )
     }
 }
 
@@ -413,7 +416,11 @@ impl Antic {
             m => (mode_height(m), self.ir & 0x20 != 0),
         };
         let start = if vs && !self.prev_vs { self.vscrol } else { 0 };
-        let end = if !vs && self.prev_vs && mode >= 2 { self.vscrol } else { height - 1 };
+        let end = if !vs && self.prev_vs && mode >= 2 {
+            self.vscrol
+        } else {
+            height - 1
+        };
         self.row = start & 0x0f;
         self.end_row = end & 0x0f;
         self.prev_vs = vs;
@@ -523,7 +530,13 @@ impl Slot {
     }
 
     fn decode(kind: u8, arg: u8) -> Result<Slot, LoadError> {
-        let idx = |a: u8| if a < 48 { Ok(a) } else { Err(LoadError::BadValue("slot index")) };
+        let idx = |a: u8| {
+            if a < 48 {
+                Ok(a)
+            } else {
+                Err(LoadError::BadValue("slot index"))
+            }
+        };
         Ok(match kind {
             0 => Slot::Free,
             1 => Slot::Missile,
@@ -548,7 +561,14 @@ impl SaveState for Antic {
         w.u8(self.dmactl);
         w.u8(self.chactl);
         w.u16(self.dlist);
-        for v in [self.hscrol, self.vscrol, self.pmbase, self.chbase, self.nmien, self.nmist] {
+        for v in [
+            self.hscrol,
+            self.vscrol,
+            self.pmbase,
+            self.chbase,
+            self.nmien,
+            self.nmist,
+        ] {
             w.u8(v);
         }
         w.u16(self.hpos);

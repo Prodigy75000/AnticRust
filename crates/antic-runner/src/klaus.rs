@@ -60,7 +60,10 @@ fn main() {
         instructions += 1;
         if cpu.pc == pc {
             println!("== Klaus Dormann 6502 functional test ==");
-            println!("trapped at ${pc:04X} after {instructions} instructions, {} cycles", cpu.cycles);
+            println!(
+                "trapped at ${pc:04X} after {instructions} instructions, {} cycles",
+                cpu.cycles
+            );
             if pc == SUCCESS_TRAP {
                 println!("PASS");
                 return;
@@ -72,7 +75,10 @@ fn main() {
             std::process::exit(1);
         }
         if cpu.cycles > CYCLE_LIMIT {
-            println!("FAIL: no trap within {CYCLE_LIMIT} cycles, pc=${:04X}", cpu.pc);
+            println!(
+                "FAIL: no trap within {CYCLE_LIMIT} cycles, pc=${:04X}",
+                cpu.pc
+            );
             std::process::exit(1);
         }
     }

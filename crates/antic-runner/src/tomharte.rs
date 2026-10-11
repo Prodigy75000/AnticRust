@@ -170,7 +170,8 @@ fn load_tests(path: &Path) -> Result<Vec<Test>, String> {
         use std::io::Read;
         let mut d = GzDecoder::new(&bytes[..]);
         let mut out = Vec::new();
-        d.read_to_end(&mut out).map_err(|e| format!("gunzip: {e}"))?;
+        d.read_to_end(&mut out)
+            .map_err(|e| format!("gunzip: {e}"))?;
         out
     } else {
         bytes
@@ -179,8 +180,7 @@ fn load_tests(path: &Path) -> Result<Vec<Test>, String> {
 }
 
 fn main() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/vendor/6502/v1");
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/vendor/6502/v1");
     if !dir.exists() {
         eprintln!(
             "vectors not found at {}\n\
@@ -228,7 +228,10 @@ fn main() {
     }
 
     println!("== TomHarte 6502 (NMOS, decimal on) ==");
-    println!("files: {files_run} run, {missing} missing (of {} requested)", stems.len());
+    println!(
+        "files: {files_run} run, {missing} missing (of {} requested)",
+        stems.len()
+    );
     println!(
         "tests: {}/{} passed ({:.2}%)",
         stats.passed,

@@ -30,7 +30,9 @@ fn main() {
     };
     for _ in 0..count {
         let (text, len) = disasm(pc, peek);
-        let bytes: Vec<String> = (0..len).map(|i| format!("{:02X}", peek(pc.wrapping_add(i)))).collect();
+        let bytes: Vec<String> = (0..len)
+            .map(|i| format!("{:02X}", peek(pc.wrapping_add(i))))
+            .collect();
         println!("{pc:04X}  {:<9} {text}", bytes.join(" "));
         pc = pc.wrapping_add(len);
     }

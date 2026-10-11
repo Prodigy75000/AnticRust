@@ -91,7 +91,10 @@ pub fn decode(op: u8) -> (&'static str, Mode) {
         _ => {}
     }
     if c == 0 && b == 4 {
-        return (["BPL", "BMI", "BVC", "BVS", "BCC", "BCS", "BNE", "BEQ"][a as usize], Rel);
+        return (
+            ["BPL", "BMI", "BVC", "BVS", "BCC", "BCS", "BNE", "BEQ"][a as usize],
+            Rel,
+        );
     }
     let mode = match (c, b) {
         (1, 0) | (3, 0) => Izx,

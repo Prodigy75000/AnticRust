@@ -2,8 +2,7 @@
 
 **You should not need anything in here.** AnticRust boots a cartridge on its own
 HLE BIOS, with no firmware dump present. That is the first of the project's two
-objectives rather than a nice-to-have, and the owner has been explicit that no
-further BIOS machinery is going into the app.
+objectives rather than a nice-to-have, and the core has no way to load one.
 
 What this directory is for is DEVELOPMENT. A real 2 KB BIOS is the oracle: when
 the HLE and the hardware disagree about what a game sees, the fastest way to

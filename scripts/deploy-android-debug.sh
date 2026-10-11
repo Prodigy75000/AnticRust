@@ -17,7 +17,7 @@
 # NOTE ON THE BIOS: there is none. The core always runs its own HLE image and
 # never asks the frontend for a firmware file.
 #
-# NOTE ON SAVE STATES: not supported yet; the core reports size 0.
+# NOTE ON SAVE STATES: fixed size, the same bytes on every platform.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

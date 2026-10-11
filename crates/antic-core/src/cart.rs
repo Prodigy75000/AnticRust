@@ -62,16 +62,28 @@ pub const ONE_CHIP_16K: [(u32, &str); 29] = [
     (0xab8e035b, "Meteorites (1983) (Electra Concepts)"),
     (0x7df1adfb, "Miner 2049er (1983) (Big Five Software)"),
     (0xd0b2f285, "Moon Patrol (1983) (Atari)"),
-    (0x4b910461, "Pitfall II - The Lost Caverns (1984) (Activision)"),
-    (0xb5f3402b, "Quest for Quintana Roo (1984) (Sunrise Software)"),
+    (
+        0x4b910461,
+        "Pitfall II - The Lost Caverns (1984) (Activision)",
+    ),
+    (
+        0xb5f3402b,
+        "Quest for Quintana Roo (1984) (Sunrise Software)",
+    ),
     (0x4252abd9, "Robotron 2084 (1983) (Atari)"),
-    (0x387365dc, "Space Shuttle - A Journey Into Space (1983) (Activision)"),
+    (
+        0x387365dc,
+        "Space Shuttle - A Journey Into Space (1983) (Activision)",
+    ),
     (0xd6f7ddfd, "Wizard of Wor (1982) (CBS)"),
     (0x2959d827, "Zone Ranger (1984) (Activision)"),
     // Prototypes and homebrew, measured the same way with `census --dir`.
     // Where both mappings ran clean, the one executing more code was taken,
     // so these carry less weight than the commercial rows above.
-    (0x35484751, "A.E. (Anti-Enviormental Encounter) (1984) (Atari) [prototype]"),
+    (
+        0x35484751,
+        "A.E. (Anti-Enviormental Encounter) (1984) (Atari) [prototype]",
+    ),
     (0xc8f9c094, "Blaster (1984) (Atari) [prototype]"),
     (0xd3bd3221, "Final Legacy (1984) (Atari) [prototype]"),
     (0x969cfe1a, "Millipede (1984) (Atari) [prototype]"),
@@ -82,8 +94,14 @@ pub const ONE_CHIP_16K: [(u32, &str); 29] = [
     (0xb0553a77, "Claim Jumper [homebrew]"),
     (0x5bd8d5ef, "Dreadnaught Factor 2, The [homebrew]"),
     (0x47dc1314, "Preppie 5200 (8-bit conversion) [homebrew]"),
-    (0xaf796cfc, "Space Invaders Deluxe (Rolkan Version) (Atari 8-bit conversion) [homebrew]"),
-    (0x99e9c00b, "Time Runner (Atari 8-bit conversion) [homebrew]"),
+    (
+        0xaf796cfc,
+        "Space Invaders Deluxe (Rolkan Version) (Atari 8-bit conversion) [homebrew]",
+    ),
+    (
+        0x99e9c00b,
+        "Time Runner (Atari 8-bit conversion) [homebrew]",
+    ),
     (0x38f4a6a4, "Xmas Demo [homebrew]"),
 ];
 
@@ -93,7 +111,11 @@ pub fn crc32(data: &[u8]) -> u32 {
     for &b in data {
         crc ^= b as u32;
         for _ in 0..8 {
-            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb8_8320 } else { crc >> 1 };
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xedb8_8320
+            } else {
+                crc >> 1
+            };
         }
     }
     !crc
@@ -138,7 +160,11 @@ impl Cart {
         if !ok {
             return Err(CartError::WrongSize(mapping, rom.len()));
         }
-        Ok(Cart { rom, mapping, bank: [0; 2] })
+        Ok(Cart {
+            rom,
+            mapping,
+            bank: [0; 2],
+        })
     }
 
     /// Pick the first candidate mapping for this size.
@@ -178,7 +204,9 @@ impl Cart {
             Mapping::Linear32 => a,
             Mapping::BountyBob40 => match addr {
                 0x4000..=0x4fff => self.bank[0] as usize * 0x1000 + (addr as usize - 0x4000),
-                0x5000..=0x5fff => 0x4000 + self.bank[1] as usize * 0x1000 + (addr as usize - 0x5000),
+                0x5000..=0x5fff => {
+                    0x4000 + self.bank[1] as usize * 0x1000 + (addr as usize - 0x5000)
+                }
                 0x8000..=0xbfff => 0x8000 + (addr as usize & 0x1fff),
                 _ => return None,
             },
@@ -214,7 +242,9 @@ mod tests {
     #[test]
     fn two_chip_16k_puts_each_half_in_its_own_16k_and_mirrors_it() {
         let c = Cart::new(image(16384), Mapping::TwoChip16).unwrap();
-        let blocks: Vec<u8> = (0..8).map(|k| c.peek(0x4000 + k * 0x1000).unwrap()).collect();
+        let blocks: Vec<u8> = (0..8)
+            .map(|k| c.peek(0x4000 + k * 0x1000).unwrap())
+            .collect();
         assert_eq!(blocks, vec![0, 1, 0, 1, 2, 3, 2, 3]);
     }
 
@@ -238,7 +268,9 @@ mod tests {
     #[test]
     fn one_chip_16k_mirrors_the_whole_image() {
         let c = Cart::new(image(16384), Mapping::OneChip16).unwrap();
-        let blocks: Vec<u8> = (0..8).map(|k| c.peek(0x4000 + k * 0x1000).unwrap()).collect();
+        let blocks: Vec<u8> = (0..8)
+            .map(|k| c.peek(0x4000 + k * 0x1000).unwrap())
+            .collect();
         assert_eq!(blocks, vec![0, 1, 2, 3, 0, 1, 2, 3]);
     }
 

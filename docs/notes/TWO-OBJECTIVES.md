@@ -1,16 +1,14 @@
 # Two objectives: no BIOS, and be approvable by RetroAchievements
 
 Written 2026-10-11, before any emulation existed, when the repo was set up.
-Everything here is either the owner's stated objective or a question flagged
+Everything here is either a stated objective or a question flagged
 open. Nothing here is a measurement, because there is nothing yet to measure.
 
 ## Objective 1: no BIOS
 
 Run the majority of commercial titles with no firmware dump present. Same as
 ColecoRust and IntelliRust, same reason: needing a BIOS file has always been a
-drag and it is worst on machines whose games are shorter than their setup. The
-owner is explicit that no further BIOS machinery is going into the app, and
-that the existing machinery is being torn down rather than extended.
+drag and it is worst on machines whose games are shorter than their setup.
 
 A real BIOS is the ORACLE, never a requirement. Run a title both ways and diff;
 when they disagree the real one is right until proven otherwise.
@@ -93,15 +91,15 @@ here is unknown and is a census question.
 **Mapper coverage.** Which bank-switching schemes actually appear in the corpus,
 as opposed to which ones exist.
 
-**Whether the boot sequence is emulated, skipped or configurable.** The owner
-decided SKIPPED for ColecoVision. Do not assume it transfers. IntelliRust found
+**Whether the boot sequence is emulated, skipped or configurable.** ColecoRust
+chose SKIPPED for the ColecoVision. Do not assume it transfers. IntelliRust found
 that on its machine "skip" really means "synthesise the post-boot state",
 because the firmware does setup the game depends on, and separated the visible
 title screen from the work behind it. Measure that boundary here before asking.
 
 **Settled 2026-10-11: SKIPPED.** The census measured the boundary (4.07
-frames of setup, 254.89 frames of logo; see BIOS-CENSUS.md), and the owner
-confirmed skip. The HLE synthesises the post-boot state and shows no logo;
+frames of setup, 254.89 frames of logo; see BIOS-CENSUS.md), and skip was
+confirmed. The HLE synthesises the post-boot state and shows no logo;
 there is no option to show one (HLE.md).
 
 ## The method that is worth copying from the siblings

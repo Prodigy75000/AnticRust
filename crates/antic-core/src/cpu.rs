@@ -487,187 +487,722 @@ impl Cpu {
     fn execute<B: CpuBus>(&mut self, bus: &mut B, op: u8) {
         match op {
             // ---------------- Loads ----------------
-            0xa9 => { let v = self.fetch(bus); self.a = v; self.set_zn(v); }
-            0xa5 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
-            0xb5 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
-            0xad => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
-            0xbd => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
-            0xb9 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
-            0xa1 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
-            0xb1 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.a = v; self.set_zn(v); }
+            0xa9 => {
+                let v = self.fetch(bus);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xa5 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xb5 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xad => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xbd => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xb9 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xa1 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
+            0xb1 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.set_zn(v);
+            }
 
-            0xa2 => { let v = self.fetch(bus); self.x = v; self.set_zn(v); }
-            0xa6 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.x = v; self.set_zn(v); }
-            0xb6 => { let a = self.addr_zp_indexed(bus, self.y); let v = self.rb(bus, a); self.x = v; self.set_zn(v); }
-            0xae => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.x = v; self.set_zn(v); }
-            0xbe => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.x = v; self.set_zn(v); }
+            0xa2 => {
+                let v = self.fetch(bus);
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xa6 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xb6 => {
+                let a = self.addr_zp_indexed(bus, self.y);
+                let v = self.rb(bus, a);
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xae => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xbe => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.x = v;
+                self.set_zn(v);
+            }
 
-            0xa0 => { let v = self.fetch(bus); self.y = v; self.set_zn(v); }
-            0xa4 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.y = v; self.set_zn(v); }
-            0xb4 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.y = v; self.set_zn(v); }
-            0xac => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.y = v; self.set_zn(v); }
-            0xbc => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.y = v; self.set_zn(v); }
+            0xa0 => {
+                let v = self.fetch(bus);
+                self.y = v;
+                self.set_zn(v);
+            }
+            0xa4 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.y = v;
+                self.set_zn(v);
+            }
+            0xb4 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.y = v;
+                self.set_zn(v);
+            }
+            0xac => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.y = v;
+                self.set_zn(v);
+            }
+            0xbc => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.y = v;
+                self.set_zn(v);
+            }
 
             // ---------------- Stores ----------------
-            0x85 => { let a = self.addr_zp(bus); self.wb(bus, a, self.a); }
-            0x95 => { let a = self.addr_zp_indexed(bus, self.x); self.wb(bus, a, self.a); }
-            0x8d => { let a = self.addr_abs(bus); self.wb(bus, a, self.a); }
-            0x9d => { let a = self.addr_abs_indexed(bus, self.x, true); self.wb(bus, a, self.a); }
-            0x99 => { let a = self.addr_abs_indexed(bus, self.y, true); self.wb(bus, a, self.a); }
-            0x81 => { let a = self.addr_izx(bus); self.wb(bus, a, self.a); }
-            0x91 => { let a = self.addr_izy(bus, true); self.wb(bus, a, self.a); }
+            0x85 => {
+                let a = self.addr_zp(bus);
+                self.wb(bus, a, self.a);
+            }
+            0x95 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.wb(bus, a, self.a);
+            }
+            0x8d => {
+                let a = self.addr_abs(bus);
+                self.wb(bus, a, self.a);
+            }
+            0x9d => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.wb(bus, a, self.a);
+            }
+            0x99 => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.wb(bus, a, self.a);
+            }
+            0x81 => {
+                let a = self.addr_izx(bus);
+                self.wb(bus, a, self.a);
+            }
+            0x91 => {
+                let a = self.addr_izy(bus, true);
+                self.wb(bus, a, self.a);
+            }
 
-            0x86 => { let a = self.addr_zp(bus); self.wb(bus, a, self.x); }
-            0x96 => { let a = self.addr_zp_indexed(bus, self.y); self.wb(bus, a, self.x); }
-            0x8e => { let a = self.addr_abs(bus); self.wb(bus, a, self.x); }
+            0x86 => {
+                let a = self.addr_zp(bus);
+                self.wb(bus, a, self.x);
+            }
+            0x96 => {
+                let a = self.addr_zp_indexed(bus, self.y);
+                self.wb(bus, a, self.x);
+            }
+            0x8e => {
+                let a = self.addr_abs(bus);
+                self.wb(bus, a, self.x);
+            }
 
-            0x84 => { let a = self.addr_zp(bus); self.wb(bus, a, self.y); }
-            0x94 => { let a = self.addr_zp_indexed(bus, self.x); self.wb(bus, a, self.y); }
-            0x8c => { let a = self.addr_abs(bus); self.wb(bus, a, self.y); }
+            0x84 => {
+                let a = self.addr_zp(bus);
+                self.wb(bus, a, self.y);
+            }
+            0x94 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.wb(bus, a, self.y);
+            }
+            0x8c => {
+                let a = self.addr_abs(bus);
+                self.wb(bus, a, self.y);
+            }
 
             // ---------------- Transfers ----------------
-            0xaa => { self.rb(bus, self.pc); self.x = self.a; self.set_zn(self.x); } // TAX
-            0xa8 => { self.rb(bus, self.pc); self.y = self.a; self.set_zn(self.y); } // TAY
-            0x8a => { self.rb(bus, self.pc); self.a = self.x; self.set_zn(self.a); } // TXA
-            0x98 => { self.rb(bus, self.pc); self.a = self.y; self.set_zn(self.a); } // TYA
-            0xba => { self.rb(bus, self.pc); self.x = self.sp; self.set_zn(self.x); } // TSX
-            0x9a => { self.rb(bus, self.pc); self.sp = self.x; } // TXS (no flags)
+            0xaa => {
+                self.rb(bus, self.pc);
+                self.x = self.a;
+                self.set_zn(self.x);
+            } // TAX
+            0xa8 => {
+                self.rb(bus, self.pc);
+                self.y = self.a;
+                self.set_zn(self.y);
+            } // TAY
+            0x8a => {
+                self.rb(bus, self.pc);
+                self.a = self.x;
+                self.set_zn(self.a);
+            } // TXA
+            0x98 => {
+                self.rb(bus, self.pc);
+                self.a = self.y;
+                self.set_zn(self.a);
+            } // TYA
+            0xba => {
+                self.rb(bus, self.pc);
+                self.x = self.sp;
+                self.set_zn(self.x);
+            } // TSX
+            0x9a => {
+                self.rb(bus, self.pc);
+                self.sp = self.x;
+            } // TXS (no flags)
 
             // ---------------- Stack ----------------
-            0x48 => { self.rb(bus, self.pc); self.push(bus, self.a); } // PHA
-            0x08 => { self.rb(bus, self.pc); let b = self.status_byte(true); self.push(bus, b); } // PHP
-            0x68 => { self.rb(bus, self.pc); self.rb(bus, 0x0100 | self.sp as u16); let v = self.pull(bus); self.a = v; self.set_zn(v); } // PLA
-            0x28 => { self.rb(bus, self.pc); self.rb(bus, 0x0100 | self.sp as u16); let v = self.pull(bus); self.set_status(v); } // PLP
+            0x48 => {
+                self.rb(bus, self.pc);
+                self.push(bus, self.a);
+            } // PHA
+            0x08 => {
+                self.rb(bus, self.pc);
+                let b = self.status_byte(true);
+                self.push(bus, b);
+            } // PHP
+            0x68 => {
+                self.rb(bus, self.pc);
+                self.rb(bus, 0x0100 | self.sp as u16);
+                let v = self.pull(bus);
+                self.a = v;
+                self.set_zn(v);
+            } // PLA
+            0x28 => {
+                self.rb(bus, self.pc);
+                self.rb(bus, 0x0100 | self.sp as u16);
+                let v = self.pull(bus);
+                self.set_status(v);
+            } // PLP
 
             // ---------------- Logical ----------------
-            0x29 => { let v = self.fetch(bus); self.and(v); }
-            0x25 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.and(v); }
-            0x35 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.and(v); }
-            0x2d => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.and(v); }
-            0x3d => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.and(v); }
-            0x39 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.and(v); }
-            0x21 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.and(v); }
-            0x31 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.and(v); }
+            0x29 => {
+                let v = self.fetch(bus);
+                self.and(v);
+            }
+            0x25 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
+            0x35 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
+            0x2d => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
+            0x3d => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
+            0x39 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
+            0x21 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
+            0x31 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.and(v);
+            }
 
-            0x09 => { let v = self.fetch(bus); self.ora(v); }
-            0x05 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.ora(v); }
-            0x15 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.ora(v); }
-            0x0d => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.ora(v); }
-            0x1d => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.ora(v); }
-            0x19 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.ora(v); }
-            0x01 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.ora(v); }
-            0x11 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.ora(v); }
+            0x09 => {
+                let v = self.fetch(bus);
+                self.ora(v);
+            }
+            0x05 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
+            0x15 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
+            0x0d => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
+            0x1d => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
+            0x19 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
+            0x01 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
+            0x11 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.ora(v);
+            }
 
-            0x49 => { let v = self.fetch(bus); self.eor(v); }
-            0x45 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.eor(v); }
-            0x55 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.eor(v); }
-            0x4d => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.eor(v); }
-            0x5d => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.eor(v); }
-            0x59 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.eor(v); }
-            0x41 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.eor(v); }
-            0x51 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.eor(v); }
+            0x49 => {
+                let v = self.fetch(bus);
+                self.eor(v);
+            }
+            0x45 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
+            0x55 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
+            0x4d => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
+            0x5d => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
+            0x59 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
+            0x41 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
+            0x51 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.eor(v);
+            }
 
-            0x24 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.bit(v); }
-            0x2c => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.bit(v); }
+            0x24 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.bit(v);
+            }
+            0x2c => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.bit(v);
+            }
 
             // ---------------- Arithmetic ----------------
-            0x69 => { let v = self.fetch(bus); self.adc(v); }
-            0x65 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.adc(v); }
-            0x75 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.adc(v); }
-            0x6d => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.adc(v); }
-            0x7d => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.adc(v); }
-            0x79 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.adc(v); }
-            0x61 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.adc(v); }
-            0x71 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.adc(v); }
+            0x69 => {
+                let v = self.fetch(bus);
+                self.adc(v);
+            }
+            0x65 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
+            0x75 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
+            0x6d => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
+            0x7d => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
+            0x79 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
+            0x61 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
+            0x71 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.adc(v);
+            }
 
-            0xe9 | 0xeb => { let v = self.fetch(bus); self.sbc(v); } // SBC + illegal alias $EB
-            0xe5 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.sbc(v); }
-            0xf5 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.sbc(v); }
-            0xed => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.sbc(v); }
-            0xfd => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.sbc(v); }
-            0xf9 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.sbc(v); }
-            0xe1 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.sbc(v); }
-            0xf1 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.sbc(v); }
+            0xe9 | 0xeb => {
+                let v = self.fetch(bus);
+                self.sbc(v);
+            } // SBC + illegal alias $EB
+            0xe5 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
+            0xf5 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
+            0xed => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
+            0xfd => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
+            0xf9 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
+            0xe1 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
+            0xf1 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.sbc(v);
+            }
 
-            0xc9 => { let v = self.fetch(bus); self.compare(self.a, v); }
-            0xc5 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.compare(self.a, v); }
-            0xd5 => { let a = self.addr_zp_indexed(bus, self.x); let v = self.rb(bus, a); self.compare(self.a, v); }
-            0xcd => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.compare(self.a, v); }
-            0xdd => { let a = self.addr_abs_indexed(bus, self.x, false); let v = self.rb(bus, a); self.compare(self.a, v); }
-            0xd9 => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.compare(self.a, v); }
-            0xc1 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.compare(self.a, v); }
-            0xd1 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.compare(self.a, v); }
+            0xc9 => {
+                let v = self.fetch(bus);
+                self.compare(self.a, v);
+            }
+            0xc5 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
+            0xd5 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
+            0xcd => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
+            0xdd => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
+            0xd9 => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
+            0xc1 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
+            0xd1 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.compare(self.a, v);
+            }
 
-            0xe0 => { let v = self.fetch(bus); self.compare(self.x, v); }
-            0xe4 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.compare(self.x, v); }
-            0xec => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.compare(self.x, v); }
+            0xe0 => {
+                let v = self.fetch(bus);
+                self.compare(self.x, v);
+            }
+            0xe4 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.x, v);
+            }
+            0xec => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.x, v);
+            }
 
-            0xc0 => { let v = self.fetch(bus); self.compare(self.y, v); }
-            0xc4 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.compare(self.y, v); }
-            0xcc => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.compare(self.y, v); }
+            0xc0 => {
+                let v = self.fetch(bus);
+                self.compare(self.y, v);
+            }
+            0xc4 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.y, v);
+            }
+            0xcc => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.compare(self.y, v);
+            }
 
             // ---------------- Inc / Dec (register) ----------------
-            0xe8 => { self.rb(bus, self.pc); self.x = self.x.wrapping_add(1); self.set_zn(self.x); }
-            0xca => { self.rb(bus, self.pc); self.x = self.x.wrapping_sub(1); self.set_zn(self.x); }
-            0xc8 => { self.rb(bus, self.pc); self.y = self.y.wrapping_add(1); self.set_zn(self.y); }
-            0x88 => { self.rb(bus, self.pc); self.y = self.y.wrapping_sub(1); self.set_zn(self.y); }
+            0xe8 => {
+                self.rb(bus, self.pc);
+                self.x = self.x.wrapping_add(1);
+                self.set_zn(self.x);
+            }
+            0xca => {
+                self.rb(bus, self.pc);
+                self.x = self.x.wrapping_sub(1);
+                self.set_zn(self.x);
+            }
+            0xc8 => {
+                self.rb(bus, self.pc);
+                self.y = self.y.wrapping_add(1);
+                self.set_zn(self.y);
+            }
+            0x88 => {
+                self.rb(bus, self.pc);
+                self.y = self.y.wrapping_sub(1);
+                self.set_zn(self.y);
+            }
 
             // ---------------- Inc / Dec (memory, RMW) ----------------
-            0xe6 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| c.inc(v)); }
-            0xf6 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| c.inc(v)); }
-            0xee => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| c.inc(v)); }
-            0xfe => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| c.inc(v)); }
-            0xc6 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| c.dec(v)); }
-            0xd6 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| c.dec(v)); }
-            0xce => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| c.dec(v)); }
-            0xde => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| c.dec(v)); }
+            0xe6 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| c.inc(v));
+            }
+            0xf6 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| c.inc(v));
+            }
+            0xee => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| c.inc(v));
+            }
+            0xfe => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| c.inc(v));
+            }
+            0xc6 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| c.dec(v));
+            }
+            0xd6 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| c.dec(v));
+            }
+            0xce => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| c.dec(v));
+            }
+            0xde => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| c.dec(v));
+            }
 
             // ---------------- Shifts / rotates ----------------
-            0x0a => { self.rb(bus, self.pc); let r = self.asl(self.a); self.a = r; }
-            0x06 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| c.asl(v)); }
-            0x16 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| c.asl(v)); }
-            0x0e => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| c.asl(v)); }
-            0x1e => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| c.asl(v)); }
+            0x0a => {
+                self.rb(bus, self.pc);
+                let r = self.asl(self.a);
+                self.a = r;
+            }
+            0x06 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| c.asl(v));
+            }
+            0x16 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| c.asl(v));
+            }
+            0x0e => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| c.asl(v));
+            }
+            0x1e => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| c.asl(v));
+            }
 
-            0x4a => { self.rb(bus, self.pc); let r = self.lsr(self.a); self.a = r; }
-            0x46 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| c.lsr(v)); }
-            0x56 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| c.lsr(v)); }
-            0x4e => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| c.lsr(v)); }
-            0x5e => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| c.lsr(v)); }
+            0x4a => {
+                self.rb(bus, self.pc);
+                let r = self.lsr(self.a);
+                self.a = r;
+            }
+            0x46 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| c.lsr(v));
+            }
+            0x56 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| c.lsr(v));
+            }
+            0x4e => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| c.lsr(v));
+            }
+            0x5e => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| c.lsr(v));
+            }
 
-            0x2a => { self.rb(bus, self.pc); let r = self.rol(self.a); self.a = r; }
-            0x26 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| c.rol(v)); }
-            0x36 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| c.rol(v)); }
-            0x2e => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| c.rol(v)); }
-            0x3e => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| c.rol(v)); }
+            0x2a => {
+                self.rb(bus, self.pc);
+                let r = self.rol(self.a);
+                self.a = r;
+            }
+            0x26 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| c.rol(v));
+            }
+            0x36 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| c.rol(v));
+            }
+            0x2e => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| c.rol(v));
+            }
+            0x3e => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| c.rol(v));
+            }
 
-            0x6a => { self.rb(bus, self.pc); let r = self.ror(self.a); self.a = r; }
-            0x66 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| c.ror(v)); }
-            0x76 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| c.ror(v)); }
-            0x6e => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| c.ror(v)); }
-            0x7e => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| c.ror(v)); }
+            0x6a => {
+                self.rb(bus, self.pc);
+                let r = self.ror(self.a);
+                self.a = r;
+            }
+            0x66 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| c.ror(v));
+            }
+            0x76 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| c.ror(v));
+            }
+            0x6e => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| c.ror(v));
+            }
+            0x7e => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| c.ror(v));
+            }
 
             // ---------------- Flag ops ----------------
-            0x18 => { self.rb(bus, self.pc); self.set_flag(CARRY, false); }
-            0x38 => { self.rb(bus, self.pc); self.set_flag(CARRY, true); }
-            0x58 => { self.rb(bus, self.pc); self.set_flag(IRQ_DISABLE, false); }
-            0x78 => { self.rb(bus, self.pc); self.set_flag(IRQ_DISABLE, true); }
-            0xb8 => { self.rb(bus, self.pc); self.set_flag(OVERFLOW, false); }
-            0xd8 => { self.rb(bus, self.pc); self.set_flag(DECIMAL, false); }
-            0xf8 => { self.rb(bus, self.pc); self.set_flag(DECIMAL, true); }
+            0x18 => {
+                self.rb(bus, self.pc);
+                self.set_flag(CARRY, false);
+            }
+            0x38 => {
+                self.rb(bus, self.pc);
+                self.set_flag(CARRY, true);
+            }
+            0x58 => {
+                self.rb(bus, self.pc);
+                self.set_flag(IRQ_DISABLE, false);
+            }
+            0x78 => {
+                self.rb(bus, self.pc);
+                self.set_flag(IRQ_DISABLE, true);
+            }
+            0xb8 => {
+                self.rb(bus, self.pc);
+                self.set_flag(OVERFLOW, false);
+            }
+            0xd8 => {
+                self.rb(bus, self.pc);
+                self.set_flag(DECIMAL, false);
+            }
+            0xf8 => {
+                self.rb(bus, self.pc);
+                self.set_flag(DECIMAL, true);
+            }
 
             // ---------------- Branches ----------------
-            0x10 => { let t = !self.get_flag(NEGATIVE); self.branch(bus, t); } // BPL
-            0x30 => { let t = self.get_flag(NEGATIVE); self.branch(bus, t); } // BMI
-            0x50 => { let t = !self.get_flag(OVERFLOW); self.branch(bus, t); } // BVC
-            0x70 => { let t = self.get_flag(OVERFLOW); self.branch(bus, t); } // BVS
-            0x90 => { let t = !self.get_flag(CARRY); self.branch(bus, t); } // BCC
-            0xb0 => { let t = self.get_flag(CARRY); self.branch(bus, t); } // BCS
-            0xd0 => { let t = !self.get_flag(ZERO); self.branch(bus, t); } // BNE
-            0xf0 => { let t = self.get_flag(ZERO); self.branch(bus, t); } // BEQ
+            0x10 => {
+                let t = !self.get_flag(NEGATIVE);
+                self.branch(bus, t);
+            } // BPL
+            0x30 => {
+                let t = self.get_flag(NEGATIVE);
+                self.branch(bus, t);
+            } // BMI
+            0x50 => {
+                let t = !self.get_flag(OVERFLOW);
+                self.branch(bus, t);
+            } // BVC
+            0x70 => {
+                let t = self.get_flag(OVERFLOW);
+                self.branch(bus, t);
+            } // BVS
+            0x90 => {
+                let t = !self.get_flag(CARRY);
+                self.branch(bus, t);
+            } // BCC
+            0xb0 => {
+                let t = self.get_flag(CARRY);
+                self.branch(bus, t);
+            } // BCS
+            0xd0 => {
+                let t = !self.get_flag(ZERO);
+                self.branch(bus, t);
+            } // BNE
+            0xf0 => {
+                let t = self.get_flag(ZERO);
+                self.branch(bus, t);
+            } // BEQ
 
             // ---------------- Jumps / calls ----------------
-            0x4c => { let a = self.addr_abs(bus); self.pc = a; } // JMP abs
+            0x4c => {
+                let a = self.addr_abs(bus);
+                self.pc = a;
+            } // JMP abs
             0x6c => {
                 // JMP indirect with the NMOS page-boundary wrap bug.
                 let ptr = self.addr_abs(bus);
@@ -718,79 +1253,453 @@ impl Cpu {
             }
 
             // ---------------- NOPs (official + illegal) ----------------
-            0xea | 0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xfa => { self.rb(bus, self.pc); } // implied NOP
-            0x80 | 0x82 | 0x89 | 0xc2 | 0xe2 => { self.fetch(bus); } // immediate NOP
-            0x04 | 0x44 | 0x64 => { let a = self.addr_zp(bus); self.rb(bus, a); } // zp NOP
-            0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 => { let a = self.addr_zp_indexed(bus, self.x); self.rb(bus, a); } // zpx NOP
-            0x0c => { let a = self.addr_abs(bus); self.rb(bus, a); } // abs NOP
-            0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc => { let a = self.addr_abs_indexed(bus, self.x, false); self.rb(bus, a); } // abx NOP (+page-cross dummy)
+            0xea | 0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xfa => {
+                self.rb(bus, self.pc);
+            } // implied NOP
+            0x80 | 0x82 | 0x89 | 0xc2 | 0xe2 => {
+                self.fetch(bus);
+            } // immediate NOP
+            0x04 | 0x44 | 0x64 => {
+                let a = self.addr_zp(bus);
+                self.rb(bus, a);
+            } // zp NOP
+            0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rb(bus, a);
+            } // zpx NOP
+            0x0c => {
+                let a = self.addr_abs(bus);
+                self.rb(bus, a);
+            } // abs NOP
+            0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc => {
+                let a = self.addr_abs_indexed(bus, self.x, false);
+                self.rb(bus, a);
+            } // abx NOP (+page-cross dummy)
 
             // ---------------- Illegal RMW+ALU (stable) ----------------
             // SLO = ASL M; ORA A,M
-            0x07 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
-            0x17 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
-            0x0f => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
-            0x1f => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
-            0x1b => { let a = self.addr_abs_indexed(bus, self.y, true); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
-            0x03 => { let a = self.addr_izx(bus); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
-            0x13 => { let a = self.addr_izy(bus, true); self.rmw(bus, a, |c, v| { let r = c.asl(v); c.ora(r); r }); }
+            0x07 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
+            0x17 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
+            0x0f => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
+            0x1f => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
+            0x1b => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
+            0x03 => {
+                let a = self.addr_izx(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
+            0x13 => {
+                let a = self.addr_izy(bus, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.asl(v);
+                    c.ora(r);
+                    r
+                });
+            }
             // RLA = ROL M; AND A,M
-            0x27 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
-            0x37 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
-            0x2f => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
-            0x3f => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
-            0x3b => { let a = self.addr_abs_indexed(bus, self.y, true); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
-            0x23 => { let a = self.addr_izx(bus); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
-            0x33 => { let a = self.addr_izy(bus, true); self.rmw(bus, a, |c, v| { let r = c.rol(v); c.and(r); r }); }
+            0x27 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
+            0x37 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
+            0x2f => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
+            0x3f => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
+            0x3b => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
+            0x23 => {
+                let a = self.addr_izx(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
+            0x33 => {
+                let a = self.addr_izy(bus, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.rol(v);
+                    c.and(r);
+                    r
+                });
+            }
             // SRE = LSR M; EOR A,M
-            0x47 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
-            0x57 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
-            0x4f => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
-            0x5f => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
-            0x5b => { let a = self.addr_abs_indexed(bus, self.y, true); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
-            0x43 => { let a = self.addr_izx(bus); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
-            0x53 => { let a = self.addr_izy(bus, true); self.rmw(bus, a, |c, v| { let r = c.lsr(v); c.eor(r); r }); }
+            0x47 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
+            0x57 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
+            0x4f => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
+            0x5f => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
+            0x5b => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
+            0x43 => {
+                let a = self.addr_izx(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
+            0x53 => {
+                let a = self.addr_izy(bus, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.lsr(v);
+                    c.eor(r);
+                    r
+                });
+            }
             // RRA = ROR M; ADC A,M
-            0x67 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
-            0x77 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
-            0x6f => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
-            0x7f => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
-            0x7b => { let a = self.addr_abs_indexed(bus, self.y, true); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
-            0x63 => { let a = self.addr_izx(bus); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
-            0x73 => { let a = self.addr_izy(bus, true); self.rmw(bus, a, |c, v| { let r = c.ror(v); c.adc(r); r }); }
+            0x67 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
+            0x77 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
+            0x6f => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
+            0x7f => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
+            0x7b => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
+            0x63 => {
+                let a = self.addr_izx(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
+            0x73 => {
+                let a = self.addr_izy(bus, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.ror(v);
+                    c.adc(r);
+                    r
+                });
+            }
             // DCP = DEC M; CMP A,M
-            0xc7 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
-            0xd7 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
-            0xcf => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
-            0xdf => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
-            0xdb => { let a = self.addr_abs_indexed(bus, self.y, true); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
-            0xc3 => { let a = self.addr_izx(bus); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
-            0xd3 => { let a = self.addr_izy(bus, true); self.rmw(bus, a, |c, v| { let r = c.dec(v); let acc = c.a; c.compare(acc, r); r }); }
+            0xc7 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
+            0xd7 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
+            0xcf => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
+            0xdf => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
+            0xdb => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
+            0xc3 => {
+                let a = self.addr_izx(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
+            0xd3 => {
+                let a = self.addr_izy(bus, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.dec(v);
+                    let acc = c.a;
+                    c.compare(acc, r);
+                    r
+                });
+            }
             // ISC = INC M; SBC A,M
-            0xe7 => { let a = self.addr_zp(bus); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
-            0xf7 => { let a = self.addr_zp_indexed(bus, self.x); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
-            0xef => { let a = self.addr_abs(bus); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
-            0xff => { let a = self.addr_abs_indexed(bus, self.x, true); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
-            0xfb => { let a = self.addr_abs_indexed(bus, self.y, true); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
-            0xe3 => { let a = self.addr_izx(bus); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
-            0xf3 => { let a = self.addr_izy(bus, true); self.rmw(bus, a, |c, v| { let r = c.inc(v); c.sbc(r); r }); }
+            0xe7 => {
+                let a = self.addr_zp(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
+            0xf7 => {
+                let a = self.addr_zp_indexed(bus, self.x);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
+            0xef => {
+                let a = self.addr_abs(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
+            0xff => {
+                let a = self.addr_abs_indexed(bus, self.x, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
+            0xfb => {
+                let a = self.addr_abs_indexed(bus, self.y, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
+            0xe3 => {
+                let a = self.addr_izx(bus);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
+            0xf3 => {
+                let a = self.addr_izy(bus, true);
+                self.rmw(bus, a, |c, v| {
+                    let r = c.inc(v);
+                    c.sbc(r);
+                    r
+                });
+            }
 
             // ---------------- Illegal: SAX / LAX ----------------
-            0x87 => { let a = self.addr_zp(bus); self.wb(bus, a, self.a & self.x); }
-            0x97 => { let a = self.addr_zp_indexed(bus, self.y); self.wb(bus, a, self.a & self.x); }
-            0x8f => { let a = self.addr_abs(bus); self.wb(bus, a, self.a & self.x); }
-            0x83 => { let a = self.addr_izx(bus); self.wb(bus, a, self.a & self.x); }
+            0x87 => {
+                let a = self.addr_zp(bus);
+                self.wb(bus, a, self.a & self.x);
+            }
+            0x97 => {
+                let a = self.addr_zp_indexed(bus, self.y);
+                self.wb(bus, a, self.a & self.x);
+            }
+            0x8f => {
+                let a = self.addr_abs(bus);
+                self.wb(bus, a, self.a & self.x);
+            }
+            0x83 => {
+                let a = self.addr_izx(bus);
+                self.wb(bus, a, self.a & self.x);
+            }
 
-            0xa7 => { let a = self.addr_zp(bus); let v = self.rb(bus, a); self.a = v; self.x = v; self.set_zn(v); }
-            0xb7 => { let a = self.addr_zp_indexed(bus, self.y); let v = self.rb(bus, a); self.a = v; self.x = v; self.set_zn(v); }
-            0xaf => { let a = self.addr_abs(bus); let v = self.rb(bus, a); self.a = v; self.x = v; self.set_zn(v); }
-            0xbf => { let a = self.addr_abs_indexed(bus, self.y, false); let v = self.rb(bus, a); self.a = v; self.x = v; self.set_zn(v); }
-            0xa3 => { let a = self.addr_izx(bus); let v = self.rb(bus, a); self.a = v; self.x = v; self.set_zn(v); }
-            0xb3 => { let a = self.addr_izy(bus, false); let v = self.rb(bus, a); self.a = v; self.x = v; self.set_zn(v); }
+            0xa7 => {
+                let a = self.addr_zp(bus);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xb7 => {
+                let a = self.addr_zp_indexed(bus, self.y);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xaf => {
+                let a = self.addr_abs(bus);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xbf => {
+                let a = self.addr_abs_indexed(bus, self.y, false);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xa3 => {
+                let a = self.addr_izx(bus);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.x = v;
+                self.set_zn(v);
+            }
+            0xb3 => {
+                let a = self.addr_izy(bus, false);
+                let v = self.rb(bus, a);
+                self.a = v;
+                self.x = v;
+                self.set_zn(v);
+            }
 
             // ---------------- Illegal immediate ALU ----------------
-            0x0b | 0x2b => { let v = self.fetch(bus); self.and(v); self.set_flag(CARRY, self.a & 0x80 != 0); } // ANC
-            0x4b => { let v = self.fetch(bus); self.a &= v; let r = self.lsr(self.a); self.a = r; } // ALR
+            0x0b | 0x2b => {
+                let v = self.fetch(bus);
+                self.and(v);
+                self.set_flag(CARRY, self.a & 0x80 != 0);
+            } // ANC
+            0x4b => {
+                let v = self.fetch(bus);
+                self.a &= v;
+                let r = self.lsr(self.a);
+                self.a = r;
+            } // ALR
             0x6b => {
                 // ARR: A = (A & M) then ROR, with quirky C/V; NMOS decimal mode
                 // adds a nibble fixup and takes C from the high nibble.
@@ -843,10 +1752,18 @@ impl Cpu {
             }
 
             // ---------------- Illegal unstable stores ----------------
-            0x9c => { self.store_high_and_val(bus, self.x, self.y); } // SHY abx: index=X, store Y & (H+1)
-            0x9e => { self.store_high_and_val(bus, self.y, self.x); } // SHX aby: index=Y, store X & (H+1)
-            0x9f => { self.store_sha(bus, self.y); } // SHA aby
-            0x93 => { self.store_sha_izy(bus); } // SHA izy
+            0x9c => {
+                self.store_high_and_val(bus, self.x, self.y);
+            } // SHY abx: index=X, store Y & (H+1)
+            0x9e => {
+                self.store_high_and_val(bus, self.y, self.x);
+            } // SHX aby: index=Y, store X & (H+1)
+            0x9f => {
+                self.store_sha(bus, self.y);
+            } // SHA aby
+            0x93 => {
+                self.store_sha_izy(bus);
+            } // SHA izy
             0x9b => {
                 // TAS/SHS aby: S = A & X; store S & (H+1)
                 self.sp = self.a & self.x;
@@ -1117,8 +2034,8 @@ mod tests {
         bus.mem[0x0202] = 0x02;
         bus.mem[0x02ff] = 0x34; // low byte of target
         bus.mem[0x0200_usize] = 0x6c; // (keep opcode; $0200 also holds PCH source)
-        // Put the PCH-source at $0200 = 0x12 would collide with opcode; use $0300
-        // to prove the bug by making $0200 the buggy source:
+                                      // Put the PCH-source at $0200 = 0x12 would collide with opcode; use $0300
+                                      // to prove the bug by making $0200 the buggy source:
         bus.mem[0x0300] = 0x99; // the *correct* (non-buggy) high source
         let mut cpu = Cpu::new();
         cpu.pc = 0x0200;

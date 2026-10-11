@@ -3,9 +3,8 @@
 
 //! AnticRust: the machine.
 //!
-//! A clean-room Atari 5200 core. Nothing is implemented yet; this file holds
-//! the constraints so they are in front of whoever writes the first module
-//! rather than in a chat log.
+//! An Atari 5200 core: the 6502C, ANTIC, GTIA, POKEY, the cartridge mappings
+//! and an HLE BIOS. This file holds the constraints the rest is built to.
 //!
 //! # Two objectives, and the second is why the project exists
 //!
@@ -22,15 +21,14 @@
 //! Both failures have obvious opposites, and they are constraints on this
 //! crate rather than aspirations:
 //!
-//! - publish `SET_MEMORY_MAPS` and `SYSTEM_RAM`, which is already a standing
-//!   rule for every in-house core and is the whole point on this one,
+//! - publish `SET_MEMORY_MAPS` and `SYSTEM_RAM`,
 //! - **never load content from inside the core.** A core with no way to open a
 //!   file cannot be made to run something the frontend did not hash. If a
 //!   convenience file picker is ever proposed here, this is the reason to
 //!   refuse it,
 //! - no BIOS configuration surface, which the HLE objective gives for free.
 //!
-//! # Binding contracts inherited from the other in-house cores
+//! # Binding contracts
 //!
 //! - **Save states are byte-identical across architectures.** Fixed size,
 //!   little-endian, versioned. Same bytes on x86-64 and arm64, because netplay

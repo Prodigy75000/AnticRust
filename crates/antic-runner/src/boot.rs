@@ -49,7 +49,10 @@ impl Probe for Shared {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut cart_path = None;
-    let mut bios_path = String::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../bios/[BIOS] Atari 5200 (USA).a52"));
+    let mut bios_path = String::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../bios/[BIOS] Atari 5200 (USA).a52"
+    ));
     let mut frames = 300u64;
     let mut map = None;
     let mut dump: Option<(u16, usize)> = None;
@@ -59,8 +62,14 @@ fn main() {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--bios" => { i += 1; bios_path = args[i].clone(); }
-            "--frames" => { i += 1; frames = args[i].parse().expect("frames"); }
+            "--bios" => {
+                i += 1;
+                bios_path = args[i].clone();
+            }
+            "--frames" => {
+                i += 1;
+                frames = args[i].parse().expect("frames");
+            }
             "--script" => script = true,
             "--dump" => {
                 let a = u16::from_str_radix(args[i + 1].trim_start_matches('$'), 16).expect("hex");
@@ -68,7 +77,11 @@ fn main() {
                 dump = Some((a, n));
                 i += 2;
             }
-            "--script-from" => { i += 1; script = true; script_from = args[i].parse().unwrap(); }
+            "--script-from" => {
+                i += 1;
+                script = true;
+                script_from = args[i].parse().unwrap();
+            }
             "--hle" => hle = true,
             "--map" => {
                 i += 1;
@@ -86,7 +99,9 @@ fn main() {
         i += 1;
     }
     let Some(cart_path) = cart_path else {
-        eprintln!("usage: boot <cart> [--bios <file>] [--frames N] [--map mirror|one|two|linear|bob]");
+        eprintln!(
+            "usage: boot <cart> [--bios <file>] [--frames N] [--map mirror|one|two|linear|bob]"
+        );
         std::process::exit(2);
     };
     let rom = std::fs::read(&cart_path).expect("read cart");
@@ -116,7 +131,10 @@ fn main() {
             m.step();
         }
         if m.cpu.halted {
-            println!("JAMMED in frame {f} at ${:04X}; the last instructions:", m.cpu.pc.wrapping_sub(1));
+            println!(
+                "JAMMED in frame {f} at ${:04X}; the last instructions:",
+                m.cpu.pc.wrapping_sub(1)
+            );
             for pc in &trail {
                 let (text, _) = disasm(*pc, |a| m.bus.peek(a).unwrap_or(0xff));
                 println!("    ${pc:04X}  {text}");
@@ -125,7 +143,14 @@ fn main() {
         }
     }
     if let Some((a, n)) = dump {
-        let bytes: Vec<String> = (0..n).map(|k| format!("{:02X}", m.bus.peek(a.wrapping_add(k as u16)).unwrap_or(0xff))).collect();
+        let bytes: Vec<String> = (0..n)
+            .map(|k| {
+                format!(
+                    "{:02X}",
+                    m.bus.peek(a.wrapping_add(k as u16)).unwrap_or(0xff)
+                )
+            })
+            .collect();
         println!("dump ${a:04X}: {}", bytes.join(" "));
     }
     let w = watch.borrow();

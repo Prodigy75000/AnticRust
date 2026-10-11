@@ -32,8 +32,7 @@
 //! Plumbing lifted from ColecoRust's `coleco-libretro` (origin/main), itself
 //! lifted from MegaRust: declare XRGB8888 explicitly (value 1, not 2), stamp
 //! the build. Struct layouts and constants are from the libretro API header,
-//! checked against the header our host compiles
-//! (TrophyHubLibretroHost/src/libretro/retro_types.h).
+//! checked against the header the host compiles.
 //!
 //! # Controls
 //!
@@ -42,10 +41,9 @@
 //! another), a twelve-key pad, and Start, Pause and Reset. The stick is read
 //! as a pot count, 1 to 227, with 114 at rest.
 //!
-//! The mapping is chosen so Trophy Hub can reuse its Intellivision pad (an
-//! analog stick, a three-button T, a twelve-key panel in the same grid): every
-//! input below is what that pad already sends, except the Select pill and a
-//! single L pill, for Pause and Reset.
+//! The mapping matches an Intellivision-style pad (an analog stick, a
+//! three-button T, a twelve-key panel in the same grid): every input below
+//! is what such a pad already sends, plus SELECT and L for Pause and Reset.
 //!
 //! | 5200 | RetroPad |
 //! |---|---|
@@ -157,7 +155,8 @@ const KEYBOARD: [(c_uint, Key); 13] = [
 
 /// `strings -a libanticrust_libretro.so | grep build=` names the commit.
 #[used]
-static BUILD_STAMP: &[u8] = concat!("ANTICRUST build=", env!("ANTICRUST_BUILD_ID"), "\0").as_bytes();
+static BUILD_STAMP: &[u8] =
+    concat!("ANTICRUST build=", env!("ANTICRUST_BUILD_ID"), "\0").as_bytes();
 
 #[repr(C)]
 pub struct RetroSystemInfo {
@@ -304,7 +303,7 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
         return;
     }
     (*info).library_name = c"AnticRust".as_ptr();
-    (*info).library_version = c"0.1.0".as_ptr();
+    (*info).library_version = concat!(env!("CARGO_PKG_VERSION"), "\0").as_ptr() as *const c_char;
     (*info).valid_extensions = c"a52|bin|rom".as_ptr();
     (*info).need_fullpath = false;
     (*info).block_extract = false;
@@ -349,7 +348,10 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
         // A hi-res pixel is 0.857 as wide as tall on NTSC (Altirra 4.2).
         aspect_ratio: (VIEW_W as f32 * 0.857) / VIEW_H as f32,
     };
-    (*info).timing = RetroSystemTiming { fps: fps(), sample_rate: SAMPLE_RATE as f64 };
+    (*info).timing = RetroSystemTiming {
+        fps: fps(),
+        sample_rate: SAMPLE_RATE as f64,
+    };
 }
 
 #[no_mangle]
@@ -379,20 +381,35 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         return false;
     }
     let rom = std::slice::from_raw_parts((*game).data as *const u8, (*game).size).to_vec();
-    let Some(machine) = machine_for(&rom) else { return false };
+    let Some(machine) = machine_for(&rom) else {
+        return false;
+    };
 
     if let Some(env) = ENVIRON {
         let mut fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-        if !env(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &mut fmt as *mut _ as *mut c_void) {
+        if !env(
+            RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
+            &mut fmt as *mut _ as *mut c_void,
+        ) {
             return false;
         }
     }
-    CORE = Some(Core { machine, rom, pal: palette(), video: vec![0; VIEW_W * VIEW_H], stereo: Vec::new(), others_seen: false });
+    CORE = Some(Core {
+        machine,
+        rom,
+        pal: palette(),
+        video: vec![0; VIEW_W * VIEW_H],
+        stereo: Vec::new(),
+        others_seen: false,
+    });
     if let Some(env) = ENVIRON {
         set_input_descriptors(env);
         set_memory_maps(env);
         let mut yes = true;
-        env(RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS, &mut yes as *mut _ as *mut c_void);
+        env(
+            RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS,
+            &mut yes as *mut _ as *mut c_void,
+        );
     }
     true
 }
@@ -418,17 +435,47 @@ unsafe fn set_input_descriptors(env: EnvironmentFn) {
             (JOY_R2, c"Keypad #"),
         ];
         for (id, name) in buttons {
-            d.push(RetroInputDescriptor { port, device: RETRO_DEVICE_JOYPAD, index: 0, id, description: name.as_ptr() });
+            d.push(RetroInputDescriptor {
+                port,
+                device: RETRO_DEVICE_JOYPAD,
+                index: 0,
+                id,
+                description: name.as_ptr(),
+            });
         }
         for (axis, name) in [(AXIS_X, c"Stick X (analog)"), (AXIS_Y, c"Stick Y (analog)")] {
-            d.push(RetroInputDescriptor { port, device: RETRO_DEVICE_ANALOG, index: ANALOG_LEFT, id: axis, description: name.as_ptr() });
+            d.push(RetroInputDescriptor {
+                port,
+                device: RETRO_DEVICE_ANALOG,
+                index: ANALOG_LEFT,
+                id: axis,
+                description: name.as_ptr(),
+            });
         }
-        for (axis, name) in [(AXIS_X, c"Keypad 4/6 (and 1/3/7/9)"), (AXIS_Y, c"Keypad 2/8 (and 1/3/7/9)")] {
-            d.push(RetroInputDescriptor { port, device: RETRO_DEVICE_ANALOG, index: ANALOG_RIGHT, id: axis, description: name.as_ptr() });
+        for (axis, name) in [
+            (AXIS_X, c"Keypad 4/6 (and 1/3/7/9)"),
+            (AXIS_Y, c"Keypad 2/8 (and 1/3/7/9)"),
+        ] {
+            d.push(RetroInputDescriptor {
+                port,
+                device: RETRO_DEVICE_ANALOG,
+                index: ANALOG_RIGHT,
+                id: axis,
+                description: name.as_ptr(),
+            });
         }
     }
-    d.push(RetroInputDescriptor { port: 0, device: 0, index: 0, id: 0, description: std::ptr::null() });
-    env(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, d.as_mut_ptr() as *mut c_void);
+    d.push(RetroInputDescriptor {
+        port: 0,
+        device: 0,
+        index: 0,
+        id: 0,
+        description: std::ptr::null(),
+    });
+    env(
+        RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+        d.as_mut_ptr() as *mut c_void,
+    );
 }
 
 /// The memory map RetroAchievements reads: the 16K of RAM at $0000-$3FFF,
@@ -436,8 +483,14 @@ unsafe fn set_input_descriptors(env: EnvironmentFn) {
 unsafe fn set_memory_maps(env: EnvironmentFn) {
     let Some(c) = core() else { return };
     let desc = [ram_descriptor(&mut c.machine)];
-    let mut map = RetroMemoryMap { descriptors: desc.as_ptr(), num_descriptors: desc.len() as c_uint };
-    env(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mut map as *mut _ as *mut c_void);
+    let mut map = RetroMemoryMap {
+        descriptors: desc.as_ptr(),
+        num_descriptors: desc.len() as c_uint,
+    };
+    env(
+        RETRO_ENVIRONMENT_SET_MEMORY_MAPS,
+        &mut map as *mut _ as *mut c_void,
+    );
 }
 
 fn ram_descriptor(m: &mut Machine) -> RetroMemoryDescriptor {
@@ -455,7 +508,11 @@ fn ram_descriptor(m: &mut Machine) -> RetroMemoryDescriptor {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn retro_load_game_special(_ty: c_uint, _info: *const RetroGameInfo, _num: usize) -> bool {
+pub unsafe extern "C" fn retro_load_game_special(
+    _ty: c_uint,
+    _info: *const RetroGameInfo,
+    _num: usize,
+) -> bool {
     false
 }
 
@@ -489,7 +546,10 @@ fn sign(v: i16) -> i8 {
 /// The keypad key a right-stick position stands for, if any.
 fn key_for_direction(x: i16, y: i16) -> Option<Key> {
     let d = (sign(x), sign(y));
-    KEY_DIRECTIONS.iter().find(|&&(dir, _)| dir == d).map(|&(_, k)| k)
+    KEY_DIRECTIONS
+        .iter()
+        .find(|&&(dir, _)| dir == d)
+        .map(|&(_, k)| k)
 }
 
 /// One controller as the frontend reports it, written into POKEY and GTIA.
@@ -509,12 +569,18 @@ unsafe fn read_controller(m: &mut Machine, state: InputStateFn, port: c_uint) ->
     } else if held(JOY_DOWN) {
         y = 227;
     }
-    let mut key = KEY_BUTTONS.iter().find(|&&(id, _)| held(id)).map(|&(_, k)| k);
+    let mut key = KEY_BUTTONS
+        .iter()
+        .find(|&&(id, _)| held(id))
+        .map(|&(_, k)| k);
     if key.is_none() {
         key = key_for_direction(axis(ANALOG_RIGHT, AXIS_X), axis(ANALOG_RIGHT, AXIS_Y));
     }
     if port == 0 && key.is_none() {
-        key = KEYBOARD.iter().find(|&&(code, _)| state(0, RETRO_DEVICE_KEYBOARD, 0, code) != 0).map(|&(_, k)| k);
+        key = KEYBOARD
+            .iter()
+            .find(|&&(code, _)| state(0, RETRO_DEVICE_KEYBOARD, 0, code) != 0)
+            .map(|&(_, k)| k);
     }
     let c = &mut m.bus.pokey.controllers[port as usize];
     c.pot = [x, y];
@@ -561,7 +627,12 @@ pub unsafe extern "C" fn retro_run() {
     c.machine.run_frame();
     view(&c.machine.bus.gtia.frame, &c.pal, &mut c.video);
     if let Some(video) = VIDEO {
-        video(c.video.as_ptr() as *const c_void, VIEW_W as c_uint, VIEW_H as c_uint, VIEW_W * 4);
+        video(
+            c.video.as_ptr() as *const c_void,
+            VIEW_W as c_uint,
+            VIEW_H as c_uint,
+            VIEW_W * 4,
+        );
     }
     // POKEY is mono; the frontend takes stereo frames.
     let mono = c.machine.bus.pokey.take_samples();
@@ -576,8 +647,7 @@ pub unsafe extern "C" fn retro_run() {
 
 // ---- save states ----
 //
-// The in-house contract (TrophyHubResources specs/play/
-// IN_HOUSE_CORE_SAVESTATE_SPEC.md): the same bytes on every platform, a
+// The same bytes on every platform, a
 // fixed size for every cartridge, and a refusal, never a panic, for a state
 // that is truncated, oversized, from a newer format, or from another kind of
 // cartridge. Netplay's state-identity token is ("anticrust",
@@ -668,7 +738,8 @@ mod tests {
                 let map = &*(data as *const RetroMemoryMap);
                 for k in 0..map.num_descriptors as usize {
                     let d = &*map.descriptors.add(k);
-                    s.maps.push((d.flags, d.offset, d.start, d.select, d.disconnect, d.len));
+                    s.maps
+                        .push((d.flags, d.offset, d.start, d.select, d.disconnect, d.len));
                     s.map_ptrs.push(d.ptr as usize);
                 }
             }
@@ -691,7 +762,12 @@ mod tests {
     unsafe fn load(rom: &[u8]) {
         *SEEN.lock().unwrap() = Some(Seen::default());
         retro_set_environment(env);
-        let info = RetroGameInfo { path: std::ptr::null(), data: rom.as_ptr() as *const c_void, size: rom.len(), meta: std::ptr::null() };
+        let info = RetroGameInfo {
+            path: std::ptr::null(),
+            data: rom.as_ptr() as *const c_void,
+            size: rom.len(),
+            meta: std::ptr::null(),
+        };
         assert!(retro_load_game(&info));
     }
 
@@ -702,10 +778,23 @@ mod tests {
             load(&cart());
             let seen = SEEN.lock().unwrap();
             let s = seen.as_ref().unwrap();
-            assert!(s.commands.contains(&0x10024), "SET_MEMORY_MAPS must be 36|0x10000, saw {:x?}", s.commands);
-            assert!(!s.commands.contains(&36) && !s.commands.contains(&35), "a bare 35 or 36 is a different command");
-            assert_eq!(s.maps, vec![(RETRO_MEMDESC_SYSTEM_RAM, 0, 0x0000, 0, 0, 0x4000)]);
-            assert_eq!(s.map_ptrs[0], retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) as usize);
+            assert!(
+                s.commands.contains(&0x10024),
+                "SET_MEMORY_MAPS must be 36|0x10000, saw {:x?}",
+                s.commands
+            );
+            assert!(
+                !s.commands.contains(&36) && !s.commands.contains(&35),
+                "a bare 35 or 36 is a different command"
+            );
+            assert_eq!(
+                s.maps,
+                vec![(RETRO_MEMDESC_SYSTEM_RAM, 0, 0x0000, 0, 0, 0x4000)]
+            );
+            assert_eq!(
+                s.map_ptrs[0],
+                retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) as usize
+            );
             assert_eq!(s.achievements, Some(true));
             assert_eq!(s.pixel_format, Some(1), "XRGB8888 is 1, not 2");
             retro_unload_game();
@@ -742,7 +831,10 @@ mod tests {
             let seen = SEEN.lock().unwrap();
             let s = seen.as_ref().unwrap();
             assert_eq!(s.maps.len(), 1, "reset must republish the map");
-            assert_eq!(s.map_ptrs[0], retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) as usize);
+            assert_eq!(
+                s.map_ptrs[0],
+                retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) as usize
+            );
             drop(seen);
             retro_unload_game();
         }
@@ -755,7 +847,11 @@ mod tests {
         left: (i16, i16),
         right: (i16, i16),
     }
-    static PAD: Mutex<Pad> = Mutex::new(Pad { buttons: 0, left: (0, 0), right: (0, 0) });
+    static PAD: Mutex<Pad> = Mutex::new(Pad {
+        buttons: 0,
+        left: (0, 0),
+        right: (0, 0),
+    });
 
     unsafe extern "C" fn input(port: c_uint, device: c_uint, index: c_uint, id: c_uint) -> i16 {
         if port != 0 {
@@ -765,8 +861,16 @@ mod tests {
         match device {
             RETRO_DEVICE_JOYPAD => ((p.buttons >> id) & 1) as i16,
             RETRO_DEVICE_ANALOG => {
-                let (x, y) = if index == ANALOG_LEFT { p.left } else { p.right };
-                if id == AXIS_X { x } else { y }
+                let (x, y) = if index == ANALOG_LEFT {
+                    p.left
+                } else {
+                    p.right
+                };
+                if id == AXIS_X {
+                    x
+                } else {
+                    y
+                }
             }
             _ => 0,
         }
@@ -783,7 +887,10 @@ mod tests {
     }
 
     fn held(ids: &[c_uint]) -> Pad {
-        Pad { buttons: ids.iter().map(|&i| 1u32 << i).sum(), ..Pad::default() }
+        Pad {
+            buttons: ids.iter().map(|&i| 1u32 << i).sum(),
+            ..Pad::default()
+        }
     }
 
     #[test]
@@ -802,7 +909,15 @@ mod tests {
             ((D, D), Key::Digit(9)),
         ];
         for (right, key) in grid {
-            assert_eq!(read(Pad { right, ..Pad::default() }).0, Some(key), "right stick {right:?}");
+            assert_eq!(
+                read(Pad {
+                    right,
+                    ..Pad::default()
+                })
+                .0,
+                Some(key),
+                "right stick {right:?}"
+            );
         }
         assert_eq!(read(held(&[JOY_R3])).0, Some(Key::Digit(5)));
         assert_eq!(read(held(&[JOY_L3])).0, Some(Key::Digit(0)));
@@ -831,11 +946,32 @@ mod tests {
     fn the_left_stick_is_proportional_and_the_dpad_is_full_travel() {
         let _g = SERIAL.lock().unwrap();
         assert_eq!(read(Pad::default()).1, [114, 114]);
-        assert_eq!(read(Pad { left: (16384, -16384), ..Pad::default() }).1, [pot(16384), pot(-16384)]);
+        assert_eq!(
+            read(Pad {
+                left: (16384, -16384),
+                ..Pad::default()
+            })
+            .1,
+            [pot(16384), pot(-16384)]
+        );
         assert_eq!(read(held(&[JOY_LEFT, JOY_DOWN])).1, [1, 227]);
         // The stick does not leak into the keypad, nor the keypad into it.
-        assert_eq!(read(Pad { left: (i16::MAX, i16::MAX), ..Pad::default() }).0, None);
-        assert_eq!(read(Pad { right: (i16::MAX, 0), ..Pad::default() }).1, [114, 114]);
+        assert_eq!(
+            read(Pad {
+                left: (i16::MAX, i16::MAX),
+                ..Pad::default()
+            })
+            .0,
+            None
+        );
+        assert_eq!(
+            read(Pad {
+                right: (i16::MAX, 0),
+                ..Pad::default()
+            })
+            .1,
+            [114, 114]
+        );
     }
 
     #[test]
@@ -847,10 +983,16 @@ mod tests {
                 retro_run();
             }
             let n = retro_serialize_size();
-            assert_eq!(n, 16_907, "a literal: the size is fixed for every cartridge");
+            assert_eq!(
+                n, 16_907,
+                "a literal: the size is fixed for every cartridge"
+            );
             let mut buf = vec![0u8; n];
             assert!(retro_serialize(buf.as_mut_ptr() as *mut c_void, n));
-            assert!(!retro_serialize(buf.as_mut_ptr() as *mut c_void, n - 1), "too small a buffer");
+            assert!(
+                !retro_serialize(buf.as_mut_ptr() as *mut c_void, n - 1),
+                "too small a buffer"
+            );
             let ram_then = core().unwrap().machine.bus.ram.to_vec();
             for _ in 0..3 {
                 retro_run();
@@ -860,8 +1002,14 @@ mod tests {
             assert_eq!(core().unwrap().machine.bus.ram.to_vec(), ram_then);
             let mut junk = buf.clone();
             junk[0] = 0;
-            assert!(!retro_unserialize(junk.as_ptr() as *const c_void, n), "wrong magic");
-            assert!(!retro_unserialize(buf.as_ptr() as *const c_void, n - 1), "truncated");
+            assert!(
+                !retro_unserialize(junk.as_ptr() as *const c_void, n),
+                "wrong magic"
+            );
+            assert!(
+                !retro_unserialize(buf.as_ptr() as *const c_void, n - 1),
+                "truncated"
+            );
             assert!(!retro_unserialize(std::ptr::null(), n));
             retro_unload_game();
             assert_eq!(retro_serialize_size(), 0, "no game, no state");
@@ -876,7 +1024,12 @@ mod tests {
         m.bus.pokey.controllers[0].top = true;
         share_keypad(&mut m, &mut seen, [true, false, false, false]);
         for c in 1..4 {
-            assert_eq!(m.bus.pokey.controllers[c].key, Some(Key::Digit(2)), "controller {}", c + 1);
+            assert_eq!(
+                m.bus.pokey.controllers[c].key,
+                Some(Key::Digit(2)),
+                "controller {}",
+                c + 1
+            );
             assert!(m.bus.pokey.controllers[c].top);
         }
         // Player 2 moves a stick: from now on the keypads are separate.
@@ -896,9 +1049,18 @@ mod tests {
         let _g = SERIAL.lock().unwrap();
         let mut m = Machine::new(Cart::identified(cart()).unwrap(), None);
         *PAD.lock().unwrap() = Pad::default();
-        assert!(!unsafe { read_controller(&mut m, input, 1) }, "port 2 reports nothing");
-        assert!(!unsafe { read_controller(&mut m, input, 0) }, "a pad at rest");
-        *PAD.lock().unwrap() = Pad { left: (0x7000, 0), ..Pad::default() };
+        assert!(
+            !unsafe { read_controller(&mut m, input, 1) },
+            "port 2 reports nothing"
+        );
+        assert!(
+            !unsafe { read_controller(&mut m, input, 0) },
+            "a pad at rest"
+        );
+        *PAD.lock().unwrap() = Pad {
+            left: (0x7000, 0),
+            ..Pad::default()
+        };
         assert!(unsafe { read_controller(&mut m, input, 0) });
         *PAD.lock().unwrap() = held(&[JOY_START]);
         assert!(unsafe { read_controller(&mut m, input, 0) });

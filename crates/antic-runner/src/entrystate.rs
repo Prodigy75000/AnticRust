@@ -68,7 +68,10 @@ fn main() {
     }
     let bios = std::fs::read(root.join("bios/[BIOS] Atari 5200 (USA).a52")).unwrap();
     let mut snaps = Vec::new();
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().path()).collect();
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
     files.sort();
     if hle {
         compare(&files, &bios);
@@ -79,7 +82,9 @@ fn main() {
         if rom.len() < 3 || rom[rom.len() - 3] == 0xff {
             continue; // skip-boot: nothing is set up
         }
-        let Some(&m0) = Mapping::candidates(rom.len()).first() else { continue };
+        let Some(&m0) = Mapping::candidates(rom.len()).first() else {
+            continue;
+        };
         let mut m = Machine::new(Cart::new(rom, m0).unwrap(), Some(&bios));
         let w = Rc::new(RefCell::new(Watch::default()));
         m.bus.probe = Some(Box::new(Shared(w.clone())));
@@ -98,7 +103,13 @@ fn main() {
         });
     }
     println!("{} full-boot titles", snaps.len());
-    let addr = |i: usize| if i < 0x100 { i as u16 } else { 0x200 + (i - 0x100) as u16 };
+    let addr = |i: usize| {
+        if i < 0x100 {
+            i as u16
+        } else {
+            0x200 + (i - 0x100) as u16
+        }
+    };
     let mut same = Vec::new();
     let mut differ = Vec::new();
     for i in 0..snaps[0].ram.len() {
@@ -119,17 +130,34 @@ fn main() {
             rsame.push(format!("{r:04X}={v:02X}"));
         }
     }
-    println!("chip registers last written, equal and nonzero: {}", rsame.join(" "));
+    println!(
+        "chip registers last written, equal and nonzero: {}",
+        rsame.join(" ")
+    );
     let c = snaps[0].cpu;
     let cpu_same = snaps.iter().all(|s| s.cpu == c);
-    println!("CPU a={:02X} x={:02X} y={:02X} sp={:02X} p={:02X} (same for all: {cpu_same})", c.0, c.1, c.2, c.3, c.4);
+    println!(
+        "CPU a={:02X} x={:02X} y={:02X} sp={:02X} p={:02X} (same for all: {cpu_same})",
+        c.0, c.1, c.2, c.3, c.4
+    );
     for s in snaps.iter().take(3) {
-        let d: Vec<String> = differ.iter().map(|a| {
-            let a = u16::from_str_radix(a, 16).unwrap();
-            let i = if a < 0x100 { a as usize } else { 0x100 + (a - 0x200) as usize };
-            format!("{:02X}", s.ram[i])
-        }).collect();
-        println!("  {:40} differing bytes: {}", &s.title[..s.title.len().min(40)], d.join(" "));
+        let d: Vec<String> = differ
+            .iter()
+            .map(|a| {
+                let a = u16::from_str_radix(a, 16).unwrap();
+                let i = if a < 0x100 {
+                    a as usize
+                } else {
+                    0x100 + (a - 0x200) as usize
+                };
+                format!("{:02X}", s.ram[i])
+            })
+            .collect();
+        println!(
+            "  {:40} differing bytes: {}",
+            &s.title[..s.title.len().min(40)],
+            d.join(" ")
+        );
     }
 }
 
@@ -153,7 +181,12 @@ fn compare(files: &[PathBuf], bios: &[u8]) {
     let mut identical = 0;
     let mut n = 0;
     // Strobes: writing them is an event, not state.
-    let strobe = |r: u16| matches!(r, 0xd40a | 0xd40f | 0xc01e | 0xe809 | 0xe80a | 0xe80b | 0xe80d);
+    let strobe = |r: u16| {
+        matches!(
+            r,
+            0xd40a | 0xd40f | 0xc01e | 0xe809 | 0xe80a | 0xe80b | 0xe80d
+        )
+    };
     for p in files {
         let rom = std::fs::read(p).unwrap();
         if rom.len() < 3 || Mapping::candidates(rom.len()).is_empty() {
@@ -174,7 +207,10 @@ fn compare(files: &[PathBuf], bios: &[u8]) {
             if strobe(r) {
                 continue;
             }
-            let (x, y) = (ga.get(&r).copied().unwrap_or(0), gb.get(&r).copied().unwrap_or(0));
+            let (x, y) = (
+                ga.get(&r).copied().unwrap_or(0),
+                gb.get(&r).copied().unwrap_or(0),
+            );
             if x != y {
                 diffs.push(format!("reg {r:04X}:{x:02X}/{y:02X}"));
             }

@@ -193,8 +193,8 @@ same kind of reason:
    - the vector table.
 2. **The font is data that 43 titles display and 21 copy.** It needs a font
    in the same character order at $F800. That means a clean-room font drawn
-   for this project, which will look different from the original. **Whether
-   that is acceptable is the owner's call.**
+   for this project, which will look different from the original, or one that
+   matches it. (Decided later: it matches; see HLE.md.)
 3. Given 1 and 2, the natural HLE is a **synthesised 2K image**: our own
    6502 code at the documented entry points, our own font, and the same
    vector table. That is one image rather than traps in the CPU loop. The

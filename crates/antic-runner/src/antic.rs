@@ -1,35 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Prodigy75000
 
-//! `antic`: the first dev harness. Boot something and step it.
+//! `antic`: what the core makes of a cartridge.
 //!
-//! Nothing to boot yet. This exists so the workspace has a binary that builds
-//! and runs from day one: the first thing a new core needs is a way to say
-//! "here is the machine, here is what it did".
+//!   antic [cart]
+//!
+//! With no cartridge, prints the machine constants. With one, prints its
+//! size, CRC-32, the mapping the core picks for it, and the size of the
+//! canonical image the RetroAchievements hash is taken over.
 
-use antic_core::{BiosMode, ContentSource, BIOS_SIZE, CPU_HZ, RAM, SAVE_STATE_VERSION};
+use antic_core::cart::{crc32, Cart};
+use antic_core::{hash, BIOS_SIZE, CPU_HZ, RAM, SAVE_STATE_VERSION};
 
 fn main() {
-    if std::env::args().any(|a| a == "--help" || a == "-h") {
-        println!("antic: AnticRust dev harness");
-        println!();
-        println!("usage: antic [--help]");
-        println!();
-        println!("Nothing is implemented yet. Two objectives: an HLE BIOS so no");
-        println!("firmware is needed, and a core RetroAchievements can approve");
-        println!("a set against, which no existing Atari 5200 core can.");
+    let arg = std::env::args().nth(1);
+    if matches!(arg.as_deref(), Some("--help" | "-h")) {
+        println!("usage: antic [cart]");
         return;
     }
 
     println!("AnticRust {}", env!("CARGO_PKG_VERSION"));
-    println!("save-state format : v{SAVE_STATE_VERSION}");
-    println!("BIOS mode         : {:?}", BiosMode::default());
-    println!("content source    : {:?} (the only one there is)", ContentSource::default());
+    println!("  6502C SALLY   {CPU_HZ:>9} Hz");
+    println!("  RAM           {RAM:>9} bytes");
+    println!("  BIOS window   {BIOS_SIZE:>9} bytes (HLE, no dump needed)");
+    println!("  save state    v{SAVE_STATE_VERSION}");
+
+    let Some(path) = arg else { return };
+    let rom = std::fs::read(&path).unwrap_or_else(|e| {
+        eprintln!("{path}: {e}");
+        std::process::exit(1);
+    });
     println!();
-    println!("  6502C SALLY   {:>9} Hz", CPU_HZ);
-    println!("  RAM           {:>9} bytes", RAM);
-    println!("  BIOS window   {:>9} bytes", BIOS_SIZE);
-    println!();
-    println!("CPU green; ANTIC DMA and NMIs, GTIA, POKEY input, timers and sound, cart mapping.");
-    println!("HLE BIOS, renderer, POKEY audio, save states; libretro core with RA memory map.");
+    println!("{path}");
+    println!("  size          {:>9} bytes", rom.len());
+    println!("  CRC-32        {:>9}", format!("{:08x}", crc32(&rom)));
+    println!("  canonical     {:>9} bytes", hash::canonical(&rom).len());
+    match Cart::identified(rom) {
+        Ok(cart) => println!("  mapping       {:?}", cart.mapping),
+        Err(e) => println!("  mapping       none ({e:?})"),
+    }
 }

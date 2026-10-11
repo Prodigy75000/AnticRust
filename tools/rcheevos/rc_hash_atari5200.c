@@ -4,7 +4,7 @@
  * Copyright (C) 2026 Prodigy75000
  *
  * Written as rcheevos would carry it, to check the rule inside rcheevos.
- * Not submitted upstream (owner, 2026-10-11).
+ * Not submitted upstream.
  *
  * The same cartridge circulates at several sizes: an image repeated to fill
  * 16K or 32K, and a two-chip 16K cartridge written out as 32K in the order

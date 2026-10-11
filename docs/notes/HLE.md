@@ -26,7 +26,7 @@ dispatcher, the NMI dispatcher, the VBI and the default DLI now keep the
 hardware's instruction order and branch layout. Tests pin each landmark
 address, because a taken branch that crosses a page boundary costs a cycle.
 
-**The font looks like the original.** The owner decided this on 2026-10-11.
+**The font looks like the original** (decided 2026-10-11).
 At 8x8, "looks like" means the same pixels. `font.rs` holds the 128 glyphs as
 text art, drawn once from the original by a script. Nothing reads a BIOS
 file to build it.
@@ -60,7 +60,7 @@ by one makes it report all 29 full-boot titles.
   Anything it randomises plays out differently from a run on the real BIOS.
   That is a different playthrough, not a fault.
 
-**Boot is SKIPPED, settled by the owner on 2026-10-11.** There is no logo and
+**Boot is SKIPPED** (settled 2026-10-11). There is no logo and
 no option to show one: drawing it would mean reproducing the firmware's logo
 screen. "Skip" here means synthesise the post-boot state, which the
 comparison above shows is exact for everything a game reads.

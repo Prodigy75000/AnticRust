@@ -59,7 +59,10 @@ pub fn reduce(rom: &[u8]) -> (Vec<u8>, Option<Mapping>) {
     }
     let start = img.len();
     // Rule 2: halve while the image is its first half repeated.
-    while img.len() > 4096 && img.len().is_power_of_two() && img[..img.len() / 2] == img[img.len() / 2..] {
+    while img.len() > 4096
+        && img.len().is_power_of_two()
+        && img[..img.len() / 2] == img[img.len() / 2..]
+    {
         img = &img[..img.len() / 2];
     }
     // Rule 3: a written-out two-chip 16K.
@@ -72,7 +75,11 @@ pub fn reduce(rom: &[u8]) -> (Vec<u8>, Option<Mapping>) {
             return (out, Some(Mapping::TwoChip16));
         }
     }
-    let implied = if img.len() == 16384 && start == 32768 { Some(Mapping::OneChip16) } else { None };
+    let implied = if img.len() == 16384 && start == 32768 {
+        Some(Mapping::OneChip16)
+    } else {
+        None
+    };
     (img.to_vec(), implied)
 }
 
@@ -93,7 +100,11 @@ mod tests {
         let x32 = [x16.clone(), x16.clone()].concat();
         assert_eq!(canonical(&x16), x);
         assert_eq!(canonical(&x32), x);
-        assert_eq!(canonical(&x), x, "an 8K image with distinct halves stays 8K");
+        assert_eq!(
+            canonical(&x),
+            x,
+            "an 8K image with distinct halves stays 8K"
+        );
     }
 
     #[test]
@@ -105,12 +116,27 @@ mod tests {
 
     #[test]
     fn a_real_32k_and_a_bounty_bob_are_left_alone() {
-        let real = [block(1, 0x2000), block(2, 0x2000), block(3, 0x2000), block(4, 0x2000)].concat();
+        let real = [
+            block(1, 0x2000),
+            block(2, 0x2000),
+            block(3, 0x2000),
+            block(4, 0x2000),
+        ]
+        .concat();
         assert_eq!(canonical(&real), real);
         // [A, B, A, B] is not two-chip, but it is its first half twice, so it
         // halves to [A, B]: a 16K image mirrored to 32K.
-        let abab = [block(1, 0x2000), block(2, 0x2000), block(1, 0x2000), block(2, 0x2000)].concat();
-        assert_eq!(canonical(&abab), [block(1, 0x2000), block(2, 0x2000)].concat());
+        let abab = [
+            block(1, 0x2000),
+            block(2, 0x2000),
+            block(1, 0x2000),
+            block(2, 0x2000),
+        ]
+        .concat();
+        assert_eq!(
+            canonical(&abab),
+            [block(1, 0x2000), block(2, 0x2000)].concat()
+        );
         let bob = (0..40960).map(|i| (i / 4096) as u8).collect::<Vec<_>>();
         assert_eq!(canonical(&bob), bob);
     }
@@ -119,8 +145,14 @@ mod tests {
     fn each_reduction_names_the_layout_it_undid() {
         let (a, b) = (block(3, 0x2000), block(4, 0x2000));
         let x = [a.clone(), b.clone()].concat();
-        assert_eq!(reduce(&[a.clone(), a.clone(), b.clone(), b.clone()].concat()).1, Some(Mapping::TwoChip16));
-        assert_eq!(reduce(&[x.clone(), x.clone()].concat()).1, Some(Mapping::OneChip16));
+        assert_eq!(
+            reduce(&[a.clone(), a.clone(), b.clone(), b.clone()].concat()).1,
+            Some(Mapping::TwoChip16)
+        );
+        assert_eq!(
+            reduce(&[x.clone(), x.clone()].concat()).1,
+            Some(Mapping::OneChip16)
+        );
         assert_eq!(reduce(&x).1, None, "an untouched 16K says nothing");
     }
 

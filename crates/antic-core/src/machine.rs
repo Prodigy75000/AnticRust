@@ -23,10 +23,10 @@
 
 use crate::antic::{Antic, DmaFetch, CYCLES_PER_LINE};
 use crate::cart::{Cart, Mapping};
-use crate::save::{LoadError, ReadCursor, SaveState, WriteCursor};
 use crate::cpu::{Cpu, CpuBus, Pending};
 use crate::gtia::Gtia;
 use crate::pokey::Pokey;
+use crate::save::{LoadError, ReadCursor, SaveState, WriteCursor};
 
 /// What kind of bus cycle a probe is seeing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -173,7 +173,11 @@ impl Bus {
     fn wsync(&mut self) {
         let h = self.antic.hpos as u64;
         let line_start = self.cycles - h;
-        self.rdy_until = if h <= 103 { line_start + 105 } else { line_start + CYCLES_PER_LINE as u64 + 105 };
+        self.rdy_until = if h <= 103 {
+            line_start + 105
+        } else {
+            line_start + CYCLES_PER_LINE as u64 + 105
+        };
         self.rdy_from = self.cycles + 2;
     }
 
@@ -307,7 +311,10 @@ impl Machine {
     /// A machine with this cartridge. With `bios` None it runs the HLE image
     /// (`hle.rs`); a real dump is for differential testing.
     pub fn new(cart: Cart, bios: Option<&[u8]>) -> Self {
-        let mut m = Machine { cpu: Cpu::new(), bus: Bus::new(cart, bios) };
+        let mut m = Machine {
+            cpu: Cpu::new(),
+            bus: Bus::new(cart, bios),
+        };
         m.reset();
         m
     }
@@ -332,11 +339,15 @@ impl Machine {
     /// The last completed frame as RGB, `gtia::WIDTH` x `gtia::HEIGHT`.
     pub fn frame_rgb(&self) -> Vec<u8> {
         let pal = crate::gtia::palette();
-        self.bus.gtia.frame.iter().flat_map(|&c| pal[c as usize]).collect()
+        self.bus
+            .gtia
+            .frame
+            .iter()
+            .flat_map(|&c| pal[c as usize])
+            .collect()
     }
 
-    /// The machine as bytes: the in-house save-state contract
-    /// (TrophyHubResources specs/play/IN_HOUSE_CORE_SAVESTATE_SPEC.md).
+    /// The machine as bytes.
     /// Little-endian, fixed widths, fixed order, no floats, and the same size
     /// for every cartridge: [`STATE_SIZE`]. Not saved: the ROM and the BIOS
     /// image (inputs), the frame buffer (redrawn every frame), the audio
@@ -479,7 +490,10 @@ mod tests {
     #[test]
     fn wsync_holds_the_cpu_until_cycle_105() {
         // STA $D40A; then LDA #0 must finish at or after cycle 105.
-        let mut m = Machine::new(cart_with(&[0x8d, 0x0a, 0xd4, 0xa9, 0x00, 0x4c, 0x05, 0x80]), Some(&tiny_bios()));
+        let mut m = Machine::new(
+            cart_with(&[0x8d, 0x0a, 0xd4, 0xa9, 0x00, 0x4c, 0x05, 0x80]),
+            Some(&tiny_bios()),
+        );
         m.step(); // JMP ($BFFE)
         while m.bus.antic.hpos != 10 {
             m.bus.tick(None);
@@ -510,10 +524,13 @@ mod tests {
         let total = m.bus.cycles - c0;
         let cpu = *counter.borrow();
         let stolen = total - cpu;
-        assert!((262 * 9 - 9..=262 * 9 + 9).contains(&stolen), "stolen {stolen} of {total}");
+        assert!(
+            (262 * 9 - 9..=262 * 9 + 9).contains(&stolen),
+            "stolen {stolen} of {total}"
+        );
     }
 
-    // ---- save states: the four test classes of the in-house contract ----
+    // ---- save states: golden, round trip, determinism, refusal ----
 
     /// A cart that keeps every chip busy, on the HLE: display DMA on, a
     /// POKEY tone, and a loop storing RANDOM into RAM. It first gives many
@@ -541,10 +558,16 @@ mod tests {
         }
         let lp = 0x8000 + prog.len() as u16;
         prog.extend_from_slice(&[
-            0xad, 0x0a, 0xe8, // loop: LDA RANDOM
-            0x9d, 0x00, 0x10, //       STA $1000,X
+            0xad,
+            0x0a,
+            0xe8, // loop: LDA RANDOM
+            0x9d,
+            0x00,
+            0x10, //       STA $1000,X
             0xe8, //                   INX
-            0x4c, lp as u8, (lp >> 8) as u8, // JMP loop
+            0x4c,
+            lp as u8,
+            (lp >> 8) as u8, // JMP loop
         ]);
         Machine::new(cart_with(&prog), None)
     }
@@ -557,7 +580,9 @@ mod tests {
 
     /// FNV-1a-64: an integer-only checksum to pin a large state with.
     fn fnv1a64(b: &[u8]) -> u64 {
-        b.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &x| (h ^ x as u64).wrapping_mul(0x100_0000_01b3))
+        b.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &x| {
+            (h ^ x as u64).wrapping_mul(0x100_0000_01b3)
+        })
     }
 
     #[test]
@@ -565,9 +590,21 @@ mod tests {
         let mut m = busy();
         run(&mut m, 3);
         let s = m.save_state();
-        assert_eq!(&s[..10], b"ANTICRST\x01\x00", "magic and version 1, little-endian");
-        assert_eq!(s.len(), 16_907, "a literal, never the serializer's own length");
-        assert_eq!(fnv1a64(&s), 0xa95c_b99c_6c85_e19d, "checksum over the whole state");
+        assert_eq!(
+            &s[..10],
+            b"ANTICRST\x01\x00",
+            "magic and version 1, little-endian"
+        );
+        assert_eq!(
+            s.len(),
+            16_907,
+            "a literal, never the serializer's own length"
+        );
+        assert_eq!(
+            fnv1a64(&s),
+            0xa95c_b99c_6c85_e19d,
+            "checksum over the whole state"
+        );
     }
 
     #[test]

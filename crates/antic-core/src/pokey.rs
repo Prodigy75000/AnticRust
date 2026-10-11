@@ -63,7 +63,11 @@ pub struct Controller {
 
 impl Default for Controller {
     fn default() -> Self {
-        Controller { pot: [POT_CENTRE; 2], key: None, top: false }
+        Controller {
+            pot: [POT_CENTRE; 2],
+            key: None,
+            top: false,
+        }
     }
 }
 
@@ -262,7 +266,8 @@ impl Pokey {
         let fast = (ch == 0 && self.audctl & 0x40 != 0) || (ch == 2 && self.audctl & 0x20 != 0);
         let linked = (ch == 1 && self.audctl & 0x10 != 0) || (ch == 3 && self.audctl & 0x08 != 0);
         if linked {
-            let lo_fast = (ch == 1 && self.audctl & 0x40 != 0) || (ch == 3 && self.audctl & 0x20 != 0);
+            let lo_fast =
+                (ch == 1 && self.audctl & 0x40 != 0) || (ch == 3 && self.audctl & 0x20 != 0);
             let v = ((self.audf[ch] as u16) << 8) | self.audf[ch - 1] as u16;
             v + if lo_fast { 6 } else { 0 }
         } else {
@@ -306,9 +311,17 @@ impl Pokey {
             let link12 = self.audctl & 0x10 != 0;
             let link34 = self.audctl & 0x08 != 0;
             let fire1 = self.clock(0, if fast1 { true } else { slow }, !link12);
-            let fire2 = if link12 { self.clock(1, if fast1 { true } else { slow }, true) } else { self.clock(1, slow, true) };
+            let fire2 = if link12 {
+                self.clock(1, if fast1 { true } else { slow }, true)
+            } else {
+                self.clock(1, slow, true)
+            };
             let fire3 = self.clock(2, if fast3 { true } else { slow }, !link34);
-            let fire4 = if link34 { self.clock(3, if fast3 { true } else { slow }, true) } else { self.clock(3, slow, true) };
+            let fire4 = if link34 {
+                self.clock(3, if fast3 { true } else { slow }, true)
+            } else {
+                self.clock(3, slow, true)
+            };
             if fire1 && !link12 {
                 self.raise(IRQ_T1);
             }
@@ -350,7 +363,11 @@ impl Pokey {
                 if self.allpot & (1 << p) == 0 {
                     continue;
                 }
-                let target = if pots_powered { self.controllers[p / 2].pot[p % 2] } else { POT_MAX };
+                let target = if pots_powered {
+                    self.controllers[p / 2].pot[p % 2]
+                } else {
+                    POT_MAX
+                };
                 if self.pot_count >= target || self.pot_count == POT_MAX {
                     self.pot_latch[p] = self.pot_count;
                     self.allpot &= !(1 << p);
@@ -405,7 +422,9 @@ impl Pokey {
     /// channels one cycle apart, channel 1 first.
     fn clock_output(&mut self, ch: usize) {
         let c = self.audc[ch];
-        let at = |pattern: &[u8], pos: u8| pattern[(pos as usize + pattern.len() - ch) % pattern.len()] == b'1';
+        let at = |pattern: &[u8], pos: u8| {
+            pattern[(pos as usize + pattern.len() - ch) % pattern.len()] == b'1'
+        };
         // Bit 7 clear: the 5-bit generator masks out some pulses.
         if c & 0x80 == 0 && !at(POLY5, self.p5) {
             return;
@@ -482,7 +501,13 @@ impl SaveState for Pokey {
     fn save(&self, w: &mut WriteCursor) {
         w.bytes(&self.audf);
         w.bytes(&self.audc);
-        for v in [self.audctl, self.skctl, self.irqen, self.irq_pending, self.kbcode] {
+        for v in [
+            self.audctl,
+            self.skctl,
+            self.irqen,
+            self.irq_pending,
+            self.kbcode,
+        ] {
             w.u8(v);
         }
         for c in self.counter {
@@ -494,7 +519,13 @@ impl SaveState for Pokey {
         w.u16(self.poly9);
         w.u8(self.pot_count);
         w.bytes(&self.pot_latch);
-        for v in [self.allpot, self.pot_line_div, self.kb_div, self.p4, self.p5] {
+        for v in [
+            self.allpot,
+            self.pot_line_div,
+            self.kb_div,
+            self.p4,
+            self.p5,
+        ] {
             w.u8(v);
         }
         for v in self.ff {
@@ -565,7 +596,9 @@ mod tests {
         }
         assert_eq!(
             seen,
-            vec![0x00, 0x80, 0x40, 0x20, 0x10, 0x88, 0x44, 0x22, 0x11, 0x88, 0xc4, 0x62, 0x31, 0x98]
+            vec![
+                0x00, 0x80, 0x40, 0x20, 0x10, 0x88, 0x44, 0x22, 0x11, 0x88, 0xc4, 0x62, 0x31, 0x98
+            ]
         );
     }
 
@@ -577,7 +610,11 @@ mod tests {
         for line in 0..230 {
             p.tick(true, true, 0);
             if line == 50 {
-                assert_eq!(p.read(0x08, true, 0) & 0x03, 0x02, "x done, y still counting");
+                assert_eq!(
+                    p.read(0x08, true, 0) & 0x03,
+                    0x02,
+                    "x done, y still counting"
+                );
             }
         }
         assert_eq!(p.read(0x00, true, 0), 40);
@@ -618,7 +655,9 @@ mod tests {
 
     /// Frequency of a sample stream by counting rising zero crossings.
     fn pitch(s: &[i16]) -> f64 {
-        let ups: Vec<usize> = (1..s.len()).filter(|&i| s[i - 1] < 0 && s[i] >= 0).collect();
+        let ups: Vec<usize> = (1..s.len())
+            .filter(|&i| s[i - 1] < 0 && s[i] >= 0)
+            .collect();
         let span = (ups[ups.len() - 1] - ups[0]) as f64;
         (ups.len() - 1) as f64 * SAMPLE_RATE as f64 / span
     }
@@ -653,7 +692,10 @@ mod tests {
         let s = run(&mut p, crate::CPU_HZ * 2);
         let tail = &s[s.len() - 480..];
         assert!(tail.iter().all(|&v| v.abs() < 64), "tail {:?}", &tail[..8]);
-        assert!(s[..480].iter().any(|&v| v.abs() > 10_000), "the step itself was audible");
+        assert!(
+            s[..480].iter().any(|&v| v.abs() > 10_000),
+            "the step itself was audible"
+        );
     }
 
     /// The output flip-flop of channel `ch` sampled after each of its timer
@@ -677,12 +719,18 @@ mod tests {
         p.write(0x04, 0x05); // AUDF3
         p.write(0x05, 0xa8); // AUDC3: pure tone
         let tone = ff_per_pulse(&mut p, 2, 64);
-        assert!(tone.windows(2).all(|w| w[0] != w[1]), "pure tone must toggle every pulse");
+        assert!(
+            tone.windows(2).all(|w| w[0] != w[1]),
+            "pure tone must toggle every pulse"
+        );
 
         p.write(0x05, 0x88); // AUDC3: poly-17 noise, no poly-5 mask
         let noise = ff_per_pulse(&mut p, 2, 256);
         let repeats = noise.windows(2).filter(|w| w[0] == w[1]).count();
-        assert!(repeats > 64, "noise repeated a level only {repeats} times in 255");
+        assert!(
+            repeats > 64,
+            "noise repeated a level only {repeats} times in 255"
+        );
         assert!(noise.iter().any(|&b| b) && noise.iter().any(|&b| !b));
     }
 
@@ -730,6 +778,9 @@ mod tests {
             p.tick(true, true, 0);
             seen.insert(p.kbcode);
         }
-        assert!(seen.contains(&0x11), "Pause reads $11 at some point: {seen:x?}");
+        assert!(
+            seen.contains(&0x11),
+            "Pause reads $11 at some point: {seen:x?}"
+        );
     }
 }

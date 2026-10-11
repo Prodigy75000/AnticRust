@@ -19,7 +19,10 @@ fn main() {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--frames" => { i += 1; frames = args[i].parse().unwrap(); }
+            "--frames" => {
+                i += 1;
+                frames = args[i].parse().unwrap();
+            }
             "--map" => {
                 i += 1;
                 map = Some(match args[i].as_str() {

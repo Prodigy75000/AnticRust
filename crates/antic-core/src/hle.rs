@@ -28,8 +28,7 @@
 //! Boot: a cart with $BFFD = $FF is entered at once, as on hardware. Any
 //! other cart gets the post-boot state the real BIOS leaves, synthesised
 //! directly from the values `entrystate` measured (identical across all 29
-//! full-boot titles), without the 4.25 s logo. SKIP is settled (owner,
-//! 2026-10-11): there is no logo. Drawing one would mean reproducing the
+//! full-boot titles), without the 4.25 s logo. There is no logo. Drawing one would mean reproducing the
 //! firmware's logo screen, which is the firmware's content, and there is no
 //! option to turn it on.
 
@@ -56,29 +55,48 @@ struct Asm {
 /// Official opcode for a mnemonic and mode. Undocumented duplicates are never
 /// chosen, so the image only contains instructions any 6502 runs alike.
 fn opcode(name: &str, mode: Mode) -> u8 {
-    const ILLEGAL: &[&str] = &["SLO", "RLA", "SRE", "RRA", "SAX", "LAX", "DCP", "ISC", "ANC", "ALR", "ARR", "XAA", "LXA", "SBX", "TAS", "LAS", "SHY", "SHX", "SHA", "JAM"];
+    const ILLEGAL: &[&str] = &[
+        "SLO", "RLA", "SRE", "RRA", "SAX", "LAX", "DCP", "ISC", "ANC", "ALR", "ARR", "XAA", "LXA",
+        "SBX", "TAS", "LAS", "SHY", "SHX", "SHA", "JAM",
+    ];
     (0..=255u8)
         .find(|&op| {
             let (n, m) = decode(op);
-            n == name && m == mode && !ILLEGAL.contains(&n) && op != 0xeb && (n != "NOP" || op == 0xea)
+            n == name
+                && m == mode
+                && !ILLEGAL.contains(&n)
+                && op != 0xeb
+                && (n != "NOP" || op == 0xea)
         })
         .unwrap_or_else(|| panic!("no opcode for {name} {mode:?}"))
 }
 
 impl Asm {
     fn new() -> Self {
-        Asm { img: [0xff; 0x800], pc: 0xf800, labels: HashMap::new(), fixups: Vec::new() }
+        Asm {
+            img: [0xff; 0x800],
+            pc: 0xf800,
+            labels: HashMap::new(),
+            fixups: Vec::new(),
+        }
     }
 
     /// Move to a fixed address. Code must never run into the next fixed
     /// block, so moving backwards is an error.
     fn org(&mut self, addr: u16) {
-        assert!(addr >= self.pc, "code at ${:04X} overran ${addr:04X}", self.pc);
+        assert!(
+            addr >= self.pc,
+            "code at ${:04X} overran ${addr:04X}",
+            self.pc
+        );
         self.pc = addr;
     }
 
     fn here(&mut self, name: &'static str) {
-        assert!(self.labels.insert(name, self.pc).is_none(), "label {name} twice");
+        assert!(
+            self.labels.insert(name, self.pc).is_none(),
+            "label {name} twice"
+        );
     }
 
     fn byte(&mut self, b: u8) {
@@ -114,7 +132,10 @@ impl Asm {
 
     fn finish(mut self) -> [u8; 0x800] {
         for (at, l, mode) in std::mem::take(&mut self.fixups) {
-            let target = *self.labels.get(l).unwrap_or_else(|| panic!("undefined label {l}"));
+            let target = *self
+                .labels
+                .get(l)
+                .unwrap_or_else(|| panic!("undefined label {l}"));
             let o = (at - 0xf800) as usize;
             if mode == Mode::Rel {
                 let d = target as i32 - (at as i32 + 1);
@@ -509,7 +530,10 @@ mod tests {
     fn the_default_vector_table_points_into_this_image() {
         let img = image();
         let targets: Vec<u16> = (0..6).map(|k| word(&img, 0xfe95 + 2 * k)).collect();
-        assert_eq!(targets, vec![0xfc03, 0xfcb8, 0xfcb2, 0xfea1, 0xfd02, 0xfcb2]);
+        assert_eq!(
+            targets,
+            vec![0xfc03, 0xfcb8, 0xfcb2, 0xfea1, 0xfd02, 0xfcb2]
+        );
     }
 
     #[test]

@@ -66,8 +66,13 @@ fn trace(rom: &[u8], mapping: Option<Mapping>, frames: u64) -> Option<Vec<(Vec<u
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let frames: u64 = args.iter().position(|a| a == "--frames").map(|k| args[k + 1].parse().unwrap()).unwrap_or(1800);
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dumps/Atari 5200 ROM Collection");
+    let frames: u64 = args
+        .iter()
+        .position(|a| a == "--frames")
+        .map(|k| args[k + 1].parse().unwrap())
+        .unwrap_or(1800);
+    let root =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../dumps/Atari 5200 ROM Collection");
     let mut files = Vec::new();
     for dir in std::fs::read_dir(&root).unwrap() {
         let dir = dir.unwrap().path();
@@ -81,7 +86,11 @@ fn main() {
     files.sort();
     if args.iter().any(|a| a == "--list") {
         for p in &files {
-            println!("{} {}", md5hex(&canonical(&std::fs::read(p).unwrap())), p.display());
+            println!(
+                "{} {}",
+                md5hex(&canonical(&std::fs::read(p).unwrap())),
+                p.display()
+            );
         }
         return;
     }
@@ -94,17 +103,35 @@ fn main() {
         let canon = canonical(&rom);
         let name = format!(
             "{}/{}",
-            p.parent().unwrap().file_name().unwrap().to_string_lossy().chars().take(4).collect::<String>(),
+            p.parent()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .chars()
+                .take(4)
+                .collect::<String>(),
             p.file_name().unwrap().to_string_lossy()
         );
         by_raw.entry(md5hex(&rom)).or_default().push(name.clone());
-        by_canon.entry(md5hex(&canon)).or_default().push(name.clone());
+        by_canon
+            .entry(md5hex(&canon))
+            .or_default()
+            .push(name.clone());
         if canon != rom {
             changed.push((name, rom, canon));
         }
     }
-    println!("{} files: {} distinct file hashes, {} distinct canonical hashes", files.len(), by_raw.len(), by_canon.len());
-    println!("\ncanonical form differs from the file for {} files:", changed.len());
+    println!(
+        "{} files: {} distinct file hashes, {} distinct canonical hashes",
+        files.len(),
+        by_raw.len(),
+        by_canon.len()
+    );
+    println!(
+        "\ncanonical form differs from the file for {} files:",
+        changed.len()
+    );
     for (name, rom, canon) in &changed {
         println!("  {:6} -> {:6}  {name}", rom.len(), canon.len());
     }
@@ -112,14 +139,20 @@ fn main() {
     for (h, names) in &by_canon {
         if names.len() > 1 {
             let raw_same = by_raw.get(h).map_or(0, |v| v.len());
-            println!("  {h}  ({} files, {} of them byte-identical to the canonical image)", names.len(), raw_same);
+            println!(
+                "  {h}  ({} files, {} of them byte-identical to the canonical image)",
+                names.len(),
+                raw_same
+            );
             for n in names {
                 println!("      {n}");
             }
         }
     }
 
-    println!("\nbehaviour, original against canonical image, HLE, {frames} frames of scripted input:");
+    println!(
+        "\nbehaviour, original against canonical image, HLE, {frames} frames of scripted input:"
+    );
     let mut same = 0;
     for (name, rom, canon) in &changed {
         // The canonical image runs under the mapping its reduction implies.
@@ -138,5 +171,8 @@ fn main() {
         };
         println!("  {verdict:28} {name}");
     }
-    println!("{same} of {} changed files run identically from their canonical image", changed.len());
+    println!(
+        "{same} of {} changed files run identically from their canonical image",
+        changed.len()
+    );
 }

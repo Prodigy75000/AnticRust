@@ -36,3 +36,6 @@
 
 # Local convenience junction to an Android app's jniLibs.
 android-jnilibs/
+
+# A local Android linker config; the example beside it is tracked.
+/.cargo/config.toml
