@@ -119,7 +119,8 @@ pub struct Pokey {
     pot_latch: [u8; 8],
     allpot: u8,
     pot_line_div: u8,
-    /// Keypad scan, in scan lines.
+    /// Keypad scan counter, 0..63, one step a scan line. Its value is the
+    /// keyboard code being tested: K0-K5.
     kb_div: u8,
     pub controllers: [Controller; 4],
     // ---- audio ----
@@ -357,16 +358,27 @@ impl Pokey {
             }
         }
 
-        // Keypad: with debounce off, a held key is reported every 32 lines.
+        // Keypad. POKEY scans 64 keyboard codes, one a line. The 5200 wires
+        // only K1-K4 to the keypad; K0 and K5 are not connected, so a held
+        // key matches at several scan addresses, and with K0 floating the
+        // code that sticks has bit 0 set. The result is two key events
+        // every 64 lines, bit 0 always 1 and bit 5 alternating: Start reads
+        // $19 then $39. a5200's input.c describes the same behaviour.
+        // Games that test KBCODE whole depend on it. Pitfall! polls for $19
+        // (Start) and $11 (Pause). Popeye acts only on the FIRST key
+        // interrupt of a press, masks to 5 bits, and wants $19, so an
+        // even code first means Start is lost.
         if line_start {
-            self.kb_div = (self.kb_div + 1) & 31;
-            if self.kb_div == 0 && self.skctl & 2 != 0 {
+            self.kb_div = (self.kb_div + 1) & 63;
+            if self.skctl & 2 != 0 {
                 let c = self.controllers[selected];
                 if let Some(k) = c.key {
-                    self.kbcode = (k.code() << 1) | if c.top { 0xc0 } else { 0 };
-                    self.raise(IRQ_KEY);
+                    if self.kb_div & 1 == 1 && (self.kb_div >> 1) & 0x0f == k.code() {
+                        self.kbcode = self.kb_div | if c.top { 0xc0 } else { 0 };
+                        self.raise(IRQ_KEY);
+                    }
                 }
-                if c.top {
+                if c.top && self.kb_div & 31 == 0 {
                     self.raise(IRQ_BREAK);
                 }
             }
@@ -692,10 +704,32 @@ mod tests {
         p.skctl = 2;
         p.irqen = IRQ_KEY;
         p.controllers[1].key = Some(Key::Start);
-        for _ in 0..32 {
+        for _ in 0..64 {
             p.tick(true, true, 1);
         }
         assert_eq!(p.kbcode & 0x1e, 0b1100 << 1);
         assert!(p.irq());
+    }
+
+    #[test]
+    fn a_held_key_reads_with_bit_0_set_and_bit_5_alternating() {
+        // Pitfall! starts on KBCODE == $19 exactly; a model that reports
+        // only code << 1 never shows it, and the game never starts.
+        let mut p = Pokey::new();
+        p.skctl = 2;
+        p.controllers[0].key = Some(Key::Start);
+        let mut seen = std::collections::BTreeSet::new();
+        for _ in 0..128 {
+            p.tick(true, true, 0);
+            seen.insert(p.kbcode);
+        }
+        assert_eq!(seen.into_iter().collect::<Vec<_>>(), vec![0x19, 0x39, 0xff]);
+        p.controllers[0].key = Some(Key::Pause);
+        let mut seen = std::collections::BTreeSet::new();
+        for _ in 0..128 {
+            p.tick(true, true, 0);
+            seen.insert(p.kbcode);
+        }
+        assert!(seen.contains(&0x11), "Pause reads $11 at some point: {seen:x?}");
     }
 }
