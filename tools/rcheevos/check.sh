@@ -22,31 +22,16 @@ trap 'rm -rf "$work"' EXIT
 
 git -C "$host" archive origin/main third_party/rcheevos | tar -x -C "$work"
 R="$work/third_party/rcheevos"
-cp "$R/src/rcheevos/consoleinfo.c" "$work/consoleinfo-5200.c"
-python - "$work/consoleinfo-5200.c" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p, encoding="utf-8").read()
-table = """/* ===== Atari 5200 ===== */
-/* 16K of RAM at $0000-$3FFF, published at the 6502's own addresses. */
-static const rc_memory_region_t _rc_memory_regions_atari5200[] = {
-    { 0x000000U, 0x003FFFU, 0x000000U, RC_MEMORY_TYPE_SYSTEM_RAM, "System RAM" }
-};
-static const rc_memory_regions_t rc_memory_regions_atari5200 = { _rc_memory_regions_atari5200, 1 };
-
-/* ===== Atari 7800 ===== */"""
-assert "/* ===== Atari 7800 ===== */" in s and "rc_memory_regions_atari5200" not in s
-s = s.replace("/* ===== Atari 7800 ===== */", table, 1)
-s = s.replace("    case RC_CONSOLE_ATARI_7800:\n      return &rc_memory_regions_atari7800;",
-              "    case RC_CONSOLE_ATARI_5200:\n      return &rc_memory_regions_atari5200;\n\n"
-              "    case RC_CONSOLE_ATARI_7800:\n      return &rc_memory_regions_atari7800;", 1)
-open(p, "w", encoding="utf-8").write(s)
-PY
+# The patched copy gets the proposed region table (apply_5200.py, shared with
+# hash-check.sh); the stock copy is left alone.
+cp -r "$R" "$work/patched"
+python "$here/apply_5200.py" "$work/patched" regions >/dev/null
+P="$work/patched"
 
 common="$R/src/rc_libretro.c $R/src/rc_compat.c $R/src/rc_util.c $(ls "$R"/src/rhash/*.c | tr '\n' ' ')"
 inc="-I$R/include -I$R/src -I$R/src/rcheevos -I$R/test"
 gcc -O1 -w $inc "$here/rc5200.c" "$R/src/rcheevos/consoleinfo.c" $common -o "$work/stock.exe"
-gcc -O1 -w $inc "$here/rc5200.c" "$work/consoleinfo-5200.c" $common -o "$work/table.exe"
+gcc -O1 -w $inc "$here/rc5200.c" "$P/src/rcheevos/consoleinfo.c" $common -o "$work/table.exe"
 
 dll="$root/target/release/anticrust_libretro.dll"
 [ -f "$dll" ] || dll="$root/target/release/libanticrust_libretro.so"

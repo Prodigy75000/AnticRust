@@ -5,8 +5,9 @@ method and memory map". This document proposes both, with the evidence for
 each, in a form RA can adopt. AnticRust is the libretro core it was checked
 against.
 
-Status 2026-10-11: **the memory map is done and verified. Hashing is still
-open** (see the end).
+Status 2026-10-11: **both are done and verified.** Every check below is a
+script in this repo that can be re-run, and each was shown to fail when the
+thing it checks is broken.
 
 ## Memory map
 
@@ -92,31 +93,104 @@ These are observations from running the 69 commercial titles
   with no fixed centre.
 - **The rest of zero page and RAM is the game's own.**
 
-## Hashing (open)
+## Hashing
+
+### The problem
 
 **rcheevos has no hash method for console 50 today.** In the version our
 host ships, `src/rhash/hash.c` rejects it both ways:
 - "Unsupported console for buffer hash: 50";
 - "Unsupported console for file hash: 50".
 
-So no 5200 game can be identified until a method is added. It is the
-other half of RA's listed gap, and the one this core cannot close by
-itself. The proposal below is what that method should be.
+Hashing the whole file, the obvious default, would be wrong for this
+machine. The 215-file corpus (69 commercial, 117 homebrew and hacks, 29
+prototypes) shows:
 
-What is settled, from `HASHING-CORPUS-CENSUS.md` and the cartridge census:
+- **No file carries a header.** Every `.a52`, `.bin` and `.rom` is a raw
+  image whose size is a multiple of 4096.
+- **The same program circulates at several sizes:**
+  - an 8K image repeated to 16K and 32K (Q-bert);
+  - a 16K image repeated to 32K (Blaster);
+  - a two-chip 16K image written out as a 32K `[lo, lo, hi, hi]` (Crazy
+    Otto, Pac-Man, Pirate Pete, Super Pac-Man).
 
-- **No file in the 215-file corpus carries a header.** Every `.a52`, `.bin`
-  and `.rom` file is a raw image whose size is a multiple of 4096. The corpus
-  holds no `.a52` and `.bin` copy of the same cartridge, so headered dumps
-  elsewhere cannot be ruled out. If one exists, its size would show it.
-- **The real hazard is layout.** The same program appears at several sizes:
-  - mirrored: an 8K image repeated to 16K or 32K;
-  - a two-chip 16K image written out as a 32K `[lo, lo, hi, hi]`.
+  A whole-file hash makes each of these a different game, so a set approved
+  against one dump would not load the other.
 
-  A hash over file bytes calls each of these a different game.
-- **The size does not decide the mapping.** Of 40 commercial 16K images, 25
-  are two-chip and 15 one-chip, measured by running each both ways.
+### Proposal
 
-A rule (hash the smallest image the layout reduces to) is drafted in
-`HASHING-CORPUS-CENSUS.md`. It still has to be checked against every mapping
-before it is proposed here.
+Hash one canonical image:
+
+1. **Skip an atari800 `CART` container header** (16 bytes: `CART`, type,
+   checksum), when the rest is a cartridge size. None appear in the corpus,
+   but the format exists. A header identifies the dumper, not the game.
+2. **While the image is its first half twice, keep only the first half,**
+   down to 4K.
+3. **Hash a 32K image of 8K blocks `[A, A, B, B]` as `A` then `B`:** the
+   two-chip 16K cartridge it was written out from.
+4. **Hash anything else whole,** including the 40K Bounty Bob image.
+
+Then take the MD5 as usual. In rcheevos terms this is `rc_hash_atari5200`
+in `tools/rcheevos/rc_hash_atari5200.c`, plus four one-line additions that
+`tools/rcheevos/apply_5200.py` makes:
+- the prototype in `rc_hash_internal.h`;
+- the buffer dispatch in `hash.c`;
+- the file dispatch in `hash.c` (buffered, like the 7800);
+- `{ "a52", ..., RC_CONSOLE_ATARI_5200 }` in the extension table.
+
+### Why the rules are safe: they never merge two images that run differently
+
+Each rule undoes a layout the hardware cannot tell apart:
+- In the 32K cartridge window, an image repeated to fill it reads the same
+  at every address.
+- Linear `[A, A, B, B]` puts A at $4000 and $6000 and B at $8000 and $A000,
+  which is exactly the two-chip mapping of `A ++ B`.
+
+That is measured, not argued. `rahash` (`crates/antic-runner/src/rahash.rs`)
+runs every file whose canonical image differs from it, original against
+canonical, on the emulator, with the same scripted input for 1800 frames:
+
+    18 of 18 changed files run identically from their canonical image
+
+That means every frame pixel-identical and all RAM identical, at every
+checkpoint. The canonical image runs under the mapping the reduction implies:
+a halved 32K is one-chip, an `[A, A, B, B]` is two-chip. Swapping A and B in
+rule 3 makes 8 of them diverge from the first checkpoint.
+
+The implied mapping also agrees with the mapping measured independently. The
+census runs every 16K file under both layouts and keeps the one that runs.
+Wherever the hash joins a 32K file to a 16K one, they agree. For example,
+`Blaster.bin` (32K, halves to 16K, so one-chip) joins the prototype
+`Blaster (1984)`, which the census measured one-chip.
+
+### What it merges
+
+    215 files: 212 distinct file hashes, 202 distinct canonical hashes
+
+The 10 extra merges are all the same program at two or three sizes:
+- Q-bert-nobutton at 8K, 16K and 32K;
+- Blaster (homebrew 32K and prototype 16K);
+- the 32K and 16K copies of Crazy Otto, Pac-Man (Bugs Fixed Hack), each of
+  the three Pirate Pete versions, and Super Pac-Man;
+- Pete's Diagnostic Cart and the prototype Pete's Diagnostics.
+
+The three groups that already shared a file hash were byte-identical
+duplicates under different names.
+
+### Verified in rcheevos
+
+`tools/rcheevos/hash-check.sh` applies the proposal to the host's
+`origin/main` rcheevos. It hashes all 215 files through
+`rc_hash_generate_from_buffer` and through `rc_hash_generate_from_file`
+(which also exercises the `a52` routing), and compares both with
+AnticRust's own implementation:
+
+    215 of 215 files: rcheevos buffer hash == rcheevos file hash == AnticRust canonical MD5
+
+Breaking the C version's rule 3 drops this to 206 of 215.
+
+### Licence
+
+rcheevos is MIT; this repository is GPL. Offering `rc_hash_atari5200.c`
+upstream would need it relicensed to MIT. That is the owner's decision and
+has not been made.

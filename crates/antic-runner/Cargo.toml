@@ -20,6 +20,8 @@ serde_json = "1"
 flate2 = "1"
 # shot harness: PNG output.
 png = "0.17"
+# rahash: MD5, as RetroAchievements hashes.
+md5 = "0.7"
 
 # CPU conformance: TomHarte single-step vectors (NMOS 6502, decimal on).
 [[bin]]
@@ -66,3 +68,8 @@ path = "src/entrystate.rs"
 [[bin]]
 name = "hlediff"
 path = "src/hlediff.rs"
+
+# The proposed RetroAchievements hash over the corpus, and its behaviour check.
+[[bin]]
+name = "rahash"
+path = "src/rahash.rs"

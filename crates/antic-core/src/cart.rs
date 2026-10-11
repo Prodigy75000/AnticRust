@@ -49,8 +49,10 @@ impl Mapping {
 /// docs/notes/BIOS-CENSUS.md. Every other 16K image runs as two-chip.
 ///
 /// This is the core's own lookup for which mapping to apply. It is not the
-/// RetroAchievements hash, which is a separate decision.
-pub const ONE_CHIP_16K: [(u32, &str); 15] = [
+/// RetroAchievements hash, which is a separate decision (`hash.rs`). The two
+/// agree: where the hash merges a 32K file with a 16K one, the layout the
+/// reduction undid matches the mapping measured here.
+pub const ONE_CHIP_16K: [(u32, &str); 29] = [
     (0xf43e7cd0, "Activision Decathlon, The (1984) (Activision)"),
     (0x9bae58dc, "Beamrider (1984) (Activision)"),
     (0xbe3cd348, "Berzerk (1983) (Atari)"),
@@ -66,6 +68,23 @@ pub const ONE_CHIP_16K: [(u32, &str); 15] = [
     (0x387365dc, "Space Shuttle - A Journey Into Space (1983) (Activision)"),
     (0xd6f7ddfd, "Wizard of Wor (1982) (CBS)"),
     (0x2959d827, "Zone Ranger (1984) (Activision)"),
+    // Prototypes and homebrew, measured the same way with `census --dir`.
+    // Where both mappings ran clean, the one executing more code was taken,
+    // so these carry less weight than the commercial rows above.
+    (0x35484751, "A.E. (Anti-Enviormental Encounter) (1984) (Atari) [prototype]"),
+    (0xc8f9c094, "Blaster (1984) (Atari) [prototype]"),
+    (0xd3bd3221, "Final Legacy (1984) (Atari) [prototype]"),
+    (0x969cfe1a, "Millipede (1984) (Atari) [prototype]"),
+    (0x0a4ddb1e, "Super Pac-Man (1982) (Atari) [prototype]"),
+    (0x1187342f, "Tempest (1983) (Atari) [prototype]"),
+    (0x0ba22ece, "Track & Field (1984) (Atari) [prototype]"),
+    (0xd1d31e79, "Capture the Flag [homebrew]"),
+    (0xb0553a77, "Claim Jumper [homebrew]"),
+    (0x5bd8d5ef, "Dreadnaught Factor 2, The [homebrew]"),
+    (0x47dc1314, "Preppie 5200 (8-bit conversion) [homebrew]"),
+    (0xaf796cfc, "Space Invaders Deluxe (Rolkan Version) (Atari 8-bit conversion) [homebrew]"),
+    (0x99e9c00b, "Time Runner (Atari 8-bit conversion) [homebrew]"),
+    (0x38f4a6a4, "Xmas Demo [homebrew]"),
 ];
 
 /// CRC-32 (IEEE, the zlib one), for [`ONE_CHIP_16K`].

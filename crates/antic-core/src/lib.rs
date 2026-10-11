@@ -57,6 +57,7 @@ pub mod cpu;
 pub mod disasm;
 pub mod font;
 pub mod gtia;
+pub mod hash;
 pub mod hle;
 pub mod machine;
 pub mod pokey;

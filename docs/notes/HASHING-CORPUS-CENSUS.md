@@ -1,5 +1,9 @@
 # Hashing: what the corpus says, first pass
 
+> **Superseded 2026-10-11.** The rule below was checked against every mapping
+> and is now proposed, with its evidence, in `RA-PROPOSAL.md` ("Hashing").
+> Kept as the first measurement it grew out of.
+
 Measured 2026-10-11 over the staged corpus (215 files). Script: group by title,
 md5 every file, compare variants byte for byte. Preliminary: it settles what
 this corpus can settle and names what it cannot.
@@ -44,7 +48,7 @@ The same program appears at different sizes. Two shapes seen:
 
 A hash over file bytes makes each of these a different game to RA.
 
-## Candidate rule (not yet adopted)
+## Candidate rule (superseded: see RA-PROPOSAL.md)
 
 Hash the minimal image: while the image is larger than 4K and is exactly its
 first half repeated, halve it; then, if it is 32K of form
