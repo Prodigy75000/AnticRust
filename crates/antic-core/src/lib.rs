@@ -75,8 +75,9 @@ pub const RAM: usize = 16 * 1024;
 /// call documented entry points, and that is the surface the HLE presents.
 pub const BIOS_SIZE: usize = 2 * 1024;
 
-/// Save-state format version. Bump on ANY layout change.
-pub const SAVE_STATE_VERSION: u32 = 0;
+/// Save-state format version: the one written into every state, defined
+/// beside the format in `machine.rs`. Bump it on ANY layout change.
+pub const SAVE_STATE_VERSION: u16 = machine::STATE_VERSION;
 
 /// How the machine gets its BIOS behaviour.
 ///

@@ -15,6 +15,8 @@
 //! DMA). Mid-line DMACTL changes are not modelled: the plan for a line is
 //! fixed when the line starts and when its display-list instruction arrives.
 
+use crate::save::{LoadError, ReadCursor, SaveState, WriteCursor};
+
 /// Machine cycles per scan line.
 pub const CYCLES_PER_LINE: u16 = 114;
 /// NTSC scan lines per frame.
@@ -499,6 +501,115 @@ impl Antic {
     /// The planned slot for cycle `c` of the current line.
     pub fn slot(&self, c: u16) -> Slot {
         self.slots[c as usize]
+    }
+}
+
+impl Slot {
+    /// (kind, argument), for the save state.
+    fn encode(self) -> (u8, u8) {
+        match self {
+            Slot::Free => (0, 0),
+            Slot::Missile => (1, 0),
+            Slot::Player(n) => (2, n),
+            Slot::DlInstr => (3, 0),
+            Slot::DlAddrLo => (4, 0),
+            Slot::DlAddrHi => (5, 0),
+            Slot::Refresh => (6, 0),
+            Slot::PfLoad(i) => (7, i),
+            Slot::PfChar(i) => (8, i),
+            Slot::PfLoadVirtual(i) => (9, i),
+            Slot::PfCharVirtual(i) => (10, i),
+        }
+    }
+
+    fn decode(kind: u8, arg: u8) -> Result<Slot, LoadError> {
+        let idx = |a: u8| if a < 48 { Ok(a) } else { Err(LoadError::BadValue("slot index")) };
+        Ok(match kind {
+            0 => Slot::Free,
+            1 => Slot::Missile,
+            2 if arg < 4 => Slot::Player(arg),
+            3 => Slot::DlInstr,
+            4 => Slot::DlAddrLo,
+            5 => Slot::DlAddrHi,
+            6 => Slot::Refresh,
+            7 => Slot::PfLoad(idx(arg)?),
+            8 => Slot::PfChar(idx(arg)?),
+            9 => Slot::PfLoadVirtual(idx(arg)?),
+            10 => Slot::PfCharVirtual(idx(arg)?),
+            _ => return Err(LoadError::BadValue("slot")),
+        })
+    }
+}
+
+/// Everything ANTIC holds, including the line's DMA plan, so a state saved
+/// mid-line resumes the exact cycle schedule.
+impl SaveState for Antic {
+    fn save(&self, w: &mut WriteCursor) {
+        w.u8(self.dmactl);
+        w.u8(self.chactl);
+        w.u16(self.dlist);
+        for v in [self.hscrol, self.vscrol, self.pmbase, self.chbase, self.nmien, self.nmist] {
+            w.u8(v);
+        }
+        w.u16(self.hpos);
+        w.u16(self.vline);
+        w.u64(self.frame);
+        for v in [self.ir, self.row, self.end_row] {
+            w.u8(v);
+        }
+        for v in [self.need_new, self.first_line, self.prev_vs, self.jvb] {
+            w.bool(v);
+        }
+        w.u16(self.memscan);
+        w.u8(self.dl_addr_lo);
+        for s in self.slots {
+            let (k, a) = s.encode();
+            w.u8(k);
+            w.u8(a);
+        }
+        w.bytes(&self.line_buf);
+        w.bytes(&self.char_buf);
+        w.bytes(&self.grafp);
+        w.u8(self.grafm);
+        w.bool(self.nmi_line);
+    }
+
+    fn load(&mut self, r: &mut ReadCursor) -> Result<(), LoadError> {
+        self.dmactl = r.u8()?;
+        self.chactl = r.u8()?;
+        self.dlist = r.u16()?;
+        self.hscrol = r.u8()?;
+        self.vscrol = r.u8()?;
+        self.pmbase = r.u8()?;
+        self.chbase = r.u8()?;
+        self.nmien = r.u8()?;
+        self.nmist = r.u8()?;
+        self.hpos = r.u16()?;
+        self.vline = r.u16()?;
+        if self.hpos >= CYCLES_PER_LINE || self.vline >= LINES_PER_FRAME {
+            return Err(LoadError::BadValue("beam position"));
+        }
+        self.frame = r.u64()?;
+        self.ir = r.u8()?;
+        self.row = r.u8()?;
+        self.end_row = r.u8()?;
+        self.need_new = r.bool()?;
+        self.first_line = r.bool()?;
+        self.prev_vs = r.bool()?;
+        self.jvb = r.bool()?;
+        self.memscan = r.u16()?;
+        self.dl_addr_lo = r.u8()?;
+        for s in self.slots.iter_mut() {
+            let k = r.u8()?;
+            let a = r.u8()?;
+            *s = Slot::decode(k, a)?;
+        }
+        r.bytes(&mut self.line_buf)?;
+        r.bytes(&mut self.char_buf)?;
+        r.bytes(&mut self.grafp)?;
+        self.grafm = r.u8()?;
+        self.nmi_line = r.bool()?;
+        Ok(())
     }
 }
 

@@ -528,24 +528,44 @@ pub unsafe extern "C" fn retro_run() {
     }
 }
 
-// ---- save states: not implemented yet ----
+// ---- save states ----
 //
-// A size of 0 is libretro's "this core does not save state"; the frontend
-// then hides the option rather than saving nothing and calling it a state.
+// The in-house contract (TrophyHubResources specs/play/
+// IN_HOUSE_CORE_SAVESTATE_SPEC.md): the same bytes on every platform, a
+// fixed size for every cartridge, and a refusal, never a panic, for a state
+// that is truncated, oversized, from a newer format, or from another kind of
+// cartridge. Netplay's state-identity token is ("anticrust",
+// STATE_VERSION, STATE_SIZE).
 
 #[no_mangle]
 pub extern "C" fn retro_serialize_size() -> usize {
-    0
+    match core() {
+        Some(_) => antic_core::machine::STATE_SIZE,
+        None => 0,
+    }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn retro_serialize(_data: *mut c_void, _size: usize) -> bool {
-    false
+pub unsafe extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
+    let Some(c) = core() else { return false };
+    let state = c.machine.save_state();
+    if data.is_null() || size < state.len() {
+        return false;
+    }
+    std::ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, state.len());
+    true
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn retro_unserialize(_data: *const c_void, _size: usize) -> bool {
-    false
+pub unsafe extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
+    let Some(c) = core() else { return false };
+    if data.is_null() {
+        return false;
+    }
+    // A frontend may hand over a buffer of the size it was told. Exactly the
+    // state, no more: anything longer is refused by load_state as oversized.
+    let bytes = std::slice::from_raw_parts(data as *const u8, size);
+    c.machine.load_state(bytes).is_ok()
 }
 
 // ---- memory interface ----
@@ -770,6 +790,36 @@ mod tests {
         // The stick does not leak into the keypad, nor the keypad into it.
         assert_eq!(read(Pad { left: (i16::MAX, i16::MAX), ..Pad::default() }).0, None);
         assert_eq!(read(Pad { right: (i16::MAX, 0), ..Pad::default() }).1, [114, 114]);
+    }
+
+    #[test]
+    fn serialize_through_the_c_abi_restores_and_refuses_garbage() {
+        let _g = SERIAL.lock().unwrap();
+        unsafe {
+            load(&cart());
+            for _ in 0..5 {
+                retro_run();
+            }
+            let n = retro_serialize_size();
+            assert_eq!(n, 16_907, "a literal: the size is fixed for every cartridge");
+            let mut buf = vec![0u8; n];
+            assert!(retro_serialize(buf.as_mut_ptr() as *mut c_void, n));
+            assert!(!retro_serialize(buf.as_mut_ptr() as *mut c_void, n - 1), "too small a buffer");
+            let ram_then = core().unwrap().machine.bus.ram.to_vec();
+            for _ in 0..3 {
+                retro_run();
+            }
+            core().unwrap().machine.bus.ram[0x10] ^= 0xff;
+            assert!(retro_unserialize(buf.as_ptr() as *const c_void, n));
+            assert_eq!(core().unwrap().machine.bus.ram.to_vec(), ram_then);
+            let mut junk = buf.clone();
+            junk[0] = 0;
+            assert!(!retro_unserialize(junk.as_ptr() as *const c_void, n), "wrong magic");
+            assert!(!retro_unserialize(buf.as_ptr() as *const c_void, n - 1), "truncated");
+            assert!(!retro_unserialize(std::ptr::null(), n));
+            retro_unload_game();
+            assert_eq!(retro_serialize_size(), 0, "no game, no state");
+        }
     }
 
     #[test]

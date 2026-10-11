@@ -30,6 +30,6 @@ fn main() {
     println!("  RAM           {:>9} bytes", RAM);
     println!("  BIOS window   {:>9} bytes", BIOS_SIZE);
     println!();
-    println!("CPU green; ANTIC DMA and NMIs, POKEY input and timers, cart mapping.");
-    println!("Boots on a real BIOS (bin boot). No renderer, no audio, no HLE yet.");
+    println!("CPU green; ANTIC DMA and NMIs, GTIA, POKEY input, timers and sound, cart mapping.");
+    println!("HLE BIOS, renderer, POKEY audio, save states; libretro core with RA memory map.");
 }

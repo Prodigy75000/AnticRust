@@ -20,6 +20,7 @@
 //! modelled; fetched bytes appear at their nominal positions.
 
 use crate::antic::Antic;
+use crate::save::{LoadError, ReadCursor, SaveState, WriteCursor};
 
 /// First and one-past-last color clock kept in the frame: the wide playfield.
 pub const FIRST_CC: u16 = 0x20;
@@ -299,6 +300,34 @@ impl Gtia {
             }
             _ => (nib << 4) | (bk & 0x0f),
         }
+    }
+}
+
+/// The frame buffer is output, redrawn every frame, and the fire buttons are
+/// input, set by the frontend every frame, so neither is saved. What is
+/// saved is what the chip holds: registers, collision latches, trigger
+/// latches, and how far along the current line it has drawn.
+impl SaveState for Gtia {
+    fn save(&self, w: &mut WriteCursor) {
+        w.bytes(&self.regs);
+        w.bytes(&self.collisions);
+        for v in self.latched {
+            w.bool(v);
+        }
+        w.u16(self.cursor);
+    }
+
+    fn load(&mut self, r: &mut ReadCursor) -> Result<(), LoadError> {
+        r.bytes(&mut self.regs)?;
+        r.bytes(&mut self.collisions)?;
+        for v in self.latched.iter_mut() {
+            *v = r.bool()?;
+        }
+        self.cursor = r.u16()?;
+        if self.cursor > 228 {
+            return Err(LoadError::BadValue("GTIA cursor"));
+        }
+        Ok(())
     }
 }
 

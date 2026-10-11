@@ -73,6 +73,8 @@ pub const POT_MAX: u8 = 228;
 /// what a frontend reports for a stick at rest.
 pub const POT_CENTRE: u8 = 114;
 
+use crate::save::{LoadError, ReadCursor, SaveState, WriteCursor};
+
 /// Audio output rate.
 pub const SAMPLE_RATE: u32 = 48_000;
 
@@ -457,6 +459,78 @@ impl Pokey {
         if self.irqen & bit != 0 {
             self.irq_pending |= bit;
         }
+    }
+}
+
+/// The controllers are input, set by the frontend every frame, and the
+/// resampler and DC blocker are the audio OUTPUT path (floats, which the
+/// save-state contract keeps out of state), so none of those is saved. A
+/// load restarts the output path from silence.
+impl SaveState for Pokey {
+    fn save(&self, w: &mut WriteCursor) {
+        w.bytes(&self.audf);
+        w.bytes(&self.audc);
+        for v in [self.audctl, self.skctl, self.irqen, self.irq_pending, self.kbcode] {
+            w.u8(v);
+        }
+        for c in self.counter {
+            w.u16(c);
+        }
+        w.u8(self.div64);
+        w.u8(self.div15);
+        w.u32(self.poly17);
+        w.u16(self.poly9);
+        w.u8(self.pot_count);
+        w.bytes(&self.pot_latch);
+        for v in [self.allpot, self.pot_line_div, self.kb_div, self.p4, self.p5] {
+            w.u8(v);
+        }
+        for v in self.ff {
+            w.bool(v);
+        }
+        for v in self.hp {
+            w.bool(v);
+        }
+    }
+
+    fn load(&mut self, r: &mut ReadCursor) -> Result<(), LoadError> {
+        r.bytes(&mut self.audf)?;
+        r.bytes(&mut self.audc)?;
+        self.audctl = r.u8()?;
+        self.skctl = r.u8()?;
+        self.irqen = r.u8()?;
+        self.irq_pending = r.u8()?;
+        self.kbcode = r.u8()?;
+        for c in self.counter.iter_mut() {
+            *c = r.u16()?;
+        }
+        self.div64 = r.u8()?;
+        self.div15 = r.u8()?;
+        self.poly17 = r.u32()?;
+        self.poly9 = r.u16()?;
+        self.pot_count = r.u8()?;
+        r.bytes(&mut self.pot_latch)?;
+        self.allpot = r.u8()?;
+        self.pot_line_div = r.u8()?;
+        self.kb_div = r.u8()?;
+        self.p4 = r.u8()?;
+        self.p5 = r.u8()?;
+        if self.p4 >= 15 || self.p5 >= 31 || self.poly17 > 0x1ffff || self.poly9 > 0x1ff {
+            return Err(LoadError::BadValue("POKEY noise generator"));
+        }
+        for v in self.ff.iter_mut() {
+            *v = r.bool()?;
+        }
+        for v in self.hp.iter_mut() {
+            *v = r.bool()?;
+        }
+        self.acc = 0.0;
+        self.acc_cycles = 0;
+        self.frac = 0;
+        self.dc_prev_in = 0.0;
+        self.dc_prev_out = 0.0;
+        self.samples.clear();
+        Ok(())
     }
 }
 

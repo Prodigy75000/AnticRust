@@ -22,7 +22,8 @@
 //! real part.
 
 use crate::antic::{Antic, DmaFetch, CYCLES_PER_LINE};
-use crate::cart::Cart;
+use crate::cart::{Cart, Mapping};
+use crate::save::{LoadError, ReadCursor, SaveState, WriteCursor};
 use crate::cpu::{Cpu, CpuBus, Pending};
 use crate::gtia::Gtia;
 use crate::pokey::Pokey;
@@ -284,6 +285,24 @@ pub struct Machine {
     pub bus: Bus,
 }
 
+/// Save-state magic and format version. Bump the version on ANY change to
+/// what [`Machine::save_state`] writes.
+pub const STATE_MAGIC: &[u8; 8] = b"ANTICRST";
+pub const STATE_VERSION: u16 = 1;
+/// The size of every state, whatever the cartridge. Pinned as a literal in
+/// the tests, never compared against the serializer itself.
+pub const STATE_SIZE: usize = 16_907;
+
+fn mapping_id(m: Mapping) -> u8 {
+    match m {
+        Mapping::Mirror => 0,
+        Mapping::OneChip16 => 1,
+        Mapping::TwoChip16 => 2,
+        Mapping::Linear32 => 3,
+        Mapping::BountyBob40 => 4,
+    }
+}
+
 impl Machine {
     /// A machine with this cartridge. With `bios` None it runs the HLE image
     /// (`hle.rs`); a real dump is for differential testing.
@@ -314,6 +333,93 @@ impl Machine {
     pub fn frame_rgb(&self) -> Vec<u8> {
         let pal = crate::gtia::palette();
         self.bus.gtia.frame.iter().flat_map(|&c| pal[c as usize]).collect()
+    }
+
+    /// The machine as bytes: the in-house save-state contract
+    /// (TrophyHubResources specs/play/IN_HOUSE_CORE_SAVESTATE_SPEC.md).
+    /// Little-endian, fixed widths, fixed order, no floats, and the same size
+    /// for every cartridge: [`STATE_SIZE`]. Not saved: the ROM and the BIOS
+    /// image (inputs), the frame buffer (redrawn every frame), the audio
+    /// output path, the controllers (set by the frontend every frame), and the
+    /// probe. The cartridge mapping IS saved, so a state cannot be loaded
+    /// into a machine running a different kind of cartridge.
+    pub fn save_state(&self) -> Vec<u8> {
+        let mut w = WriteCursor::new();
+        w.bytes(STATE_MAGIC);
+        w.u16(STATE_VERSION);
+        self.cpu.save(&mut w);
+        let b = &self.bus;
+        w.u64(b.cycles);
+        w.u64(b.rdy_from);
+        w.u64(b.rdy_until);
+        w.u8(b.open_bus);
+        w.bytes(&b.ram[..]);
+        w.u8(mapping_id(b.cart.mapping));
+        w.bytes(&b.cart.bank());
+        b.antic.save(&mut w);
+        b.gtia.save(&mut w);
+        b.pokey.save(&mut w);
+        w.into_bytes()
+    }
+
+    /// Restore [`Machine::save_state`]'s bytes. All or nothing: everything is
+    /// decoded into copies first, and the machine changes only if the whole
+    /// state is valid. A wrong magic, a newer version, a truncated or
+    /// oversized buffer, a bad field, or a state from a different cartridge
+    /// mapping is refused.
+    pub fn load_state(&mut self, bytes: &[u8]) -> Result<(), LoadError> {
+        let mut r = ReadCursor::new(bytes);
+        let mut magic = [0u8; 8];
+        r.bytes(&mut magic)?;
+        if &magic != STATE_MAGIC {
+            return Err(LoadError::BadMagic);
+        }
+        let version = r.u16()?;
+        if version != STATE_VERSION {
+            return Err(LoadError::UnsupportedVersion(version));
+        }
+        let mut cpu = self.cpu.clone();
+        cpu.load(&mut r)?;
+        let cycles = r.u64()?;
+        let rdy_from = r.u64()?;
+        let rdy_until = r.u64()?;
+        let open_bus = r.u8()?;
+        let mut ram = [0u8; 0x4000];
+        r.bytes(&mut ram)?;
+        if r.u8()? != mapping_id(self.bus.cart.mapping) {
+            return Err(LoadError::BadValue("cartridge mapping"));
+        }
+        let mut bank = [0u8; 2];
+        r.bytes(&mut bank)?;
+        if bank.iter().any(|&k| k > 3) {
+            return Err(LoadError::BadValue("cartridge bank"));
+        }
+        let mut antic = self.bus.antic.clone();
+        antic.load(&mut r)?;
+        let mut gtia = self.bus.gtia.clone();
+        gtia.load(&mut r)?;
+        let mut pokey = self.bus.pokey.clone();
+        pokey.load(&mut r)?;
+        r.finish()?;
+
+        // Valid: commit.
+        self.cpu = cpu;
+        let b = &mut self.bus;
+        b.cycles = cycles;
+        b.rdy_from = rdy_from;
+        b.rdy_until = rdy_until;
+        b.open_bus = open_bus;
+        b.ram.copy_from_slice(&ram);
+        b.cart.set_bank(bank);
+        b.antic = antic;
+        b.gtia = gtia;
+        // The controllers are the frontend's, not the state's.
+        let controllers = b.pokey.controllers;
+        b.pokey = pokey;
+        b.pokey.controllers = controllers;
+        b.first_access = false;
+        b.in_interrupt = false;
+        Ok(())
     }
 
     /// Run until ANTIC finishes the current frame.
@@ -405,5 +511,130 @@ mod tests {
         let cpu = *counter.borrow();
         let stolen = total - cpu;
         assert!((262 * 9 - 9..=262 * 9 + 9).contains(&stolen), "stolen {stolen} of {total}");
+    }
+
+    // ---- save states: the four test classes of the in-house contract ----
+
+    /// A cart that keeps every chip busy, on the HLE: display DMA on, a
+    /// POKEY tone, and a loop storing RANDOM into RAM. It first gives many
+    /// registers DISTINCT non-zero values, because a golden test cannot see
+    /// two fields swap places if both hold the same value: with HSCROL and
+    /// VSCROL both zero, swapping them in the writer left the checksum green.
+    fn busy() -> Machine {
+        let mut prog = Vec::new();
+        for (v, addr) in [
+            (0x22u8, 0xd400u16), // DMACTL
+            (0x02, 0xd401),      // CHACTL
+            (0x05, 0xd404),      // HSCROL
+            (0x03, 0xd405),      // VSCROL
+            (0x30, 0xd407),      // PMBASE
+            (0xe0, 0xd409),      // CHBASE
+            (0x04, 0xc01b),      // PRIOR
+            (0x94, 0xc01a),      // COLBK
+            (0x46, 0xc016),      // COLPF0
+            (0x03, 0xe80f),      // SKCTL
+            (0x01, 0xe808),      // AUDCTL
+            (0xa8, 0xe801),      // AUDC1
+            (0x40, 0xe800),      // AUDF1
+        ] {
+            prog.extend_from_slice(&[0xa9, v, 0x8d, addr as u8, (addr >> 8) as u8]);
+        }
+        let lp = 0x8000 + prog.len() as u16;
+        prog.extend_from_slice(&[
+            0xad, 0x0a, 0xe8, // loop: LDA RANDOM
+            0x9d, 0x00, 0x10, //       STA $1000,X
+            0xe8, //                   INX
+            0x4c, lp as u8, (lp >> 8) as u8, // JMP loop
+        ]);
+        Machine::new(cart_with(&prog), None)
+    }
+
+    fn run(m: &mut Machine, frames: u32) {
+        for _ in 0..frames {
+            m.run_frame();
+        }
+    }
+
+    /// FNV-1a-64: an integer-only checksum to pin a large state with.
+    fn fnv1a64(b: &[u8]) -> u64 {
+        b.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &x| (h ^ x as u64).wrapping_mul(0x100_0000_01b3))
+    }
+
+    #[test]
+    fn golden_state_bytes() {
+        let mut m = busy();
+        run(&mut m, 3);
+        let s = m.save_state();
+        assert_eq!(&s[..10], b"ANTICRST\x01\x00", "magic and version 1, little-endian");
+        assert_eq!(s.len(), 16_907, "a literal, never the serializer's own length");
+        assert_eq!(fnv1a64(&s), 0xa95c_b99c_6c85_e19d, "checksum over the whole state");
+    }
+
+    #[test]
+    fn a_state_round_trips_byte_identically() {
+        let mut a = busy();
+        run(&mut a, 5);
+        let s = a.save_state();
+        let mut b = busy();
+        b.load_state(&s).unwrap();
+        assert_eq!(b.save_state(), s);
+    }
+
+    #[test]
+    fn a_restored_machine_continues_exactly_as_the_original() {
+        let mut a = busy();
+        run(&mut a, 7);
+        let s = a.save_state();
+        let mut b = busy();
+        run(&mut b, 2); // somewhere else entirely, then restored
+        b.load_state(&s).unwrap();
+        run(&mut a, 11);
+        run(&mut b, 11);
+        assert_eq!(a.bus.ram[..], b.bus.ram[..]);
+        assert_eq!(a.bus.gtia.frame, b.bus.gtia.frame);
+        assert_eq!(a.save_state(), b.save_state());
+    }
+
+    #[test]
+    fn two_machines_fed_the_same_produce_the_same_bytes() {
+        let (mut a, mut b) = (busy(), busy());
+        run(&mut a, 9);
+        run(&mut b, 9);
+        assert_eq!(a.save_state(), b.save_state());
+    }
+
+    #[test]
+    fn bad_states_are_refused_and_leave_the_machine_untouched() {
+        let mut a = busy();
+        run(&mut a, 4);
+        let good = a.save_state();
+        let mut m = busy();
+        run(&mut m, 1);
+        let before = m.save_state();
+
+        let mut cases: Vec<(&str, Vec<u8>)> = Vec::new();
+        cases.push(("truncated", good[..good.len() - 1].to_vec()));
+        cases.push(("oversized", [good.clone(), vec![0]].concat()));
+        cases.push(("empty", Vec::new()));
+        let mut wrong_magic = good.clone();
+        wrong_magic[0] = b'X';
+        cases.push(("wrong magic", wrong_magic));
+        let mut newer = good.clone();
+        newer[8] = 2;
+        cases.push(("newer version", newer));
+        // The mapping byte sits after header, CPU, bus timing and RAM.
+        let mapping_at = 10 + 20 + 25 + 0x4000;
+        let mut other_cart = good.clone();
+        other_cart[mapping_at] = 3;
+        cases.push(("another cartridge's state", other_cart));
+        let mut bad_bank = good.clone();
+        bad_bank[mapping_at + 1] = 9;
+        cases.push(("impossible bank", bad_bank));
+
+        for (what, bytes) in cases {
+            assert!(m.load_state(&bytes).is_err(), "{what} was accepted");
+            assert_eq!(m.save_state(), before, "{what} changed the machine");
+        }
+        assert_eq!(good.len(), 16_907);
     }
 }

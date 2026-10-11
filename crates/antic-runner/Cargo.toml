@@ -73,3 +73,8 @@ path = "src/hlediff.rs"
 [[bin]]
 name = "rahash"
 path = "src/rahash.rs"
+
+# Save states against every game: save, continue, restore elsewhere, compare.
+[[bin]]
+name = "statecheck"
+path = "src/statecheck.rs"
