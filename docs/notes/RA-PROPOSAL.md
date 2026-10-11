@@ -94,6 +94,15 @@ These are observations from running the 69 commercial titles
 
 ## Hashing (open)
 
+**rcheevos has no hash method for console 50 today.** In the version our
+host ships, `src/rhash/hash.c` rejects it both ways:
+- "Unsupported console for buffer hash: 50";
+- "Unsupported console for file hash: 50".
+
+So no 5200 game can be identified until a method is added. It is the
+other half of RA's listed gap, and the one this core cannot close by
+itself. The proposal below is what that method should be.
+
 What is settled, from `HASHING-CORPUS-CENSUS.md` and the cartridge census:
 
 - **No file in the 215-file corpus carries a header.** Every `.a52`, `.bin`
